@@ -3,21 +3,38 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import distance
 from numpy.linalg import inv
+from numpy.linalg import matrix_rank
+from datetime import datetime
+import os
+from sympy.utilities.iterables import multiset_permutations
 
 
-def gen_codebook(m, dim):  # TODO: control the norm of the codewords, specified by x_norm_max
-    mu = [0, 0]  # TODO: not hard coded mu and cov
-    cov = [[1, 0.5], [0.5, 1]]
-    rv = multivariate_normal(mu, cov)
-    return rv.rvs(m)  # codebook is m x d
-
-
-def gen_noise_dataset(noise_type, n, dim):
-    if noise_type == "Gaussian":
-        mu = [0, 0]  # TODO: not hard coded mu and cov
-        cov = [[0.1, 0.05], [0.05, 0.1]]
+def gen_codebook(codebook_type, m, d):
+    if codebook_type == "Gaussian":
+        mu = d*[0]
+        cov_diag = np.random.normal(0, 1, size=d)
+        scaled_cov_diag = cov_diag/np.sum(cov_diag)
+        cov = np.diag(scaled_cov_diag)
         rv = multivariate_normal(mu, cov)
-        return rv.rvs(n)  # noise samples are n x d
+        return rv.rvs(m), cov  # codebook is m x d
+    if codebook_type == "Grid":
+        codewords_per_axis = int(np.ceil(m**(1/d)))
+        grid = list(multiset_permutations(np.linspace(-1, 1, codewords_per_axis), d))
+        repetitions = [d*[e] for e in np.linspace(-1, 1, codewords_per_axis) if e != 0]
+        complete_grid = np.array(grid+repetitions)
+        indexlist = np.argsort(np.linalg.norm(complete_grid, axis=1))
+        return complete_grid[indexlist[:m]], None
+
+
+def gen_noise_dataset(noise_type, n, d, noise_energy):
+    cov = None
+    if noise_type == "Gaussian":
+        mu = d*[0]
+        cov_diag = np.random.normal(0, 1, size=d)
+        scaled_cov_diag = noise_energy*cov_diag/np.sum(cov_diag)
+        cov = np.diag(scaled_cov_diag)
+        rv = multivariate_normal(mu, cov)
+        return rv.rvs(n), cov  # noise samples are n x d
 
 
 def dataset_transform(codebook, noise_dataset, m, n, d):
@@ -74,7 +91,8 @@ def decode(codebook, dataset, m, n, d, S):
     return classification
 
 
-def plot_decoding(dataset, classification, m, n, d, t, fig):
+def plot_decoding(dataset, classification, m, n, d, t):
+    fig = plt.figure()
     examples = dataset.reshape(m * n, d)
     cm = plt.get_cmap('gist_rainbow')
     ax = fig.add_subplot(111)
@@ -83,4 +101,39 @@ def plot_decoding(dataset, classification, m, n, d, t, fig):
         ax.scatter(examples[np.where(classification == i), 0], examples[np.where(classification == i), 1])
     ax.set_title("Classification")
     plt.grid()
-    plt.savefig('imgs/Iteration_'+str(t).zfill(6))
+    plt.savefig('Iteration_'+str(t).zfill(6))
+
+
+def gen_partition(d, deltas):
+    P = []
+    for delta in deltas:
+        succ = False
+        for p_i in P:
+            p_i_pre = np.asarray(p_i)
+            rank_pre = matrix_rank(p_i_pre)
+            p_i.append(delta)
+            p_i_post = np.asarray(p_i)
+            rank_post = matrix_rank(p_i_post)
+            if rank_post == rank_pre:
+                succ = True
+                break
+        if not succ:
+            if len(P) < d:
+                new_p = [delta]
+                P.append(new_p)
+            else:
+                P[np.random.randint(d)].append(delta)
+    P_arr = []
+    for p_i in P:
+        P_arr.append(np.array(p_i))
+    return P_arr
+
+
+def make_run_dir():
+    if not os.path.exists("runs"):
+        os.mkdir("runs")
+    os.chdir("runs")
+    now = datetime.now()
+    dt_string = now.strftime("%Y_%m_%d_%H%M%S")
+    os.mkdir(dt_string)
+    os.chdir(dt_string)
