@@ -4,17 +4,13 @@ from numpy.random import RandomState
 from numpy.linalg import inv
 from numpy import linalg as LA
 import utils
+import pickle
+import os
 
 
 def init_precision_matrix(d):
     a = np.random.rand(d, d)
     return np.dot(a, a.T)
-
-
-def get_near_psd(s):
-    eigval, eigvec = np.linalg.eig(s)
-    eigval[eigval < 0] = 0
-    return eigvec.dot(np.diag(eigval)).dot(eigvec.T)
 
 
 def plot_pegasos(s_array, codebook, dataset, m, n, d):
@@ -24,10 +20,10 @@ def plot_pegasos(s_array, codebook, dataset, m, n, d):
             utils.plot_decoding(dataset, classification, m, n, d, t)
 
 
-def subgradient_alg(steps, m, n, deltas, etas, d, codebook, dataset, scale_lambda, partition):
+def subgradient_alg(iterations, m, n, deltas, etas, d, codebook, dataset, scale_lambda, partition):
     s_array = []
     s = np.zeros((d, d))
-    for t in range(1, steps+1):
+    for t in range(1, iterations+1):
         p_t = np.random.randint(m-1)
         q_t = np.random.randint(p_t+1, m)
         x_p_t = np.expand_dims(codebook[p_t], axis=1)
@@ -46,68 +42,96 @@ def subgradient_alg(steps, m, n, deltas, etas, d, codebook, dataset, scale_lambd
             grad_t += etas[i] * (s @ delta_p_q_star @ delta_p_q_star.T + delta_p_q_star @ delta_p_q_star.T @ s)
         grad_t = scale_lambda*grad_t - v_t
         s -= (1/(scale_lambda*t))*grad_t
-        s = get_near_psd(s)
+        s = utils.get_near_psd(s)
         s_array.append(s)
     return s_array
 
 
-def log_run_info(d, m, n, codebook, iterations, scale_lambda, etas, codebook_type, codeword_energy, noise_type,
-                 noise_energy, code_cov, noise_cov):
+def log_run_info(basic_dict):
     file1 = open("log.txt", "w")
-    file1.write("Dimension "+str(d)+"\n")
-    file1.write("Number of codewords " + str(m)+"\n")
-    file1.write("Codebook type:" + codebook_type + "\n")
-    file1.write("codewords energy " + str(codeword_energy)+"\n")
-    if code_cov is not None:
+    file1.write("Dimension: "+str(basic_dict['d'])+"\n")
+    file1.write("Number of codewords: " + str(basic_dict['m'])+"\n")
+    file1.write("Codebook type: " + basic_dict['codebook_type'] + "\n")
+    file1.write("codewords energy: " + str(basic_dict['codeword_energy'])+"\n")
+    file1.write("Noise type: " + basic_dict['noise_type'] + "\n")
+    file1.write("codewords energy: " + str(basic_dict['noise_energy']) + "\n")
+    file1.write("Number of iterations: " + str(basic_dict['iterations'])+"\n")
+    file1.write("Lambda: " + str(basic_dict['scale_lambda'])+"\n")
+    file1.write("Etas: " + str(basic_dict['etas'])+"\n")
+    file1.write("Seed: " + str(basic_dict['seed']) + "\n")
+    if basic_dict['code_cov'] is not None:
         file1.write("Random codebook covariance:" + "\n")
-        file1.write(str(code_cov) + "\n")
-    file1.write("Codebook:"+"\n")
-    file1.write(str(codebook)+"\n")
-    file1.write("Noise type:" + noise_type + "\n")
-    if code_cov is not None:
-        file1.write("Random noise covariance:" + "\n")
-        file1.write(str(noise_cov) + "\n")
-    file1.write("codewords energy " + str(noise_energy) + "\n")
-    file1.write("Number of iterations " + str(iterations)+"\n")
-    file1.write("Lambda " + str(scale_lambda)+"\n")
-    file1.write("Etas " + str(etas)+"\n")
-    file1.write("Seed " + str(seed) + "\n")
+        file1.write(str(basic_dict['code_cov']) + "\n")
+    if basic_dict['noise_cov'] is not None:
+        file1.write("Random noise covariance(s):" + "\n")
+        file1.write(str(basic_dict['noise_cov']) + "\n")
     file1.close()
 
 
+def save_data(codebook, noise_dataset, s_array, basic_dict):
+    f = open('codebook.npy', 'wb')
+    np.save(f, codebook)
+    f.close()
+    f = open('noise_dataset.npy', 'wb')
+    np.save(f, noise_dataset)
+    f.close()
+    f = open('s_array.npy', 'wb')
+    np.save(f, s_array)
+    f.close()
+    outfile = open("basic_dict", 'wb')
+    pickle.dump(basic_dict, outfile)
+    outfile.close()
+
+
 def main():
-    utils.make_run_dir()
-    d = 2  # dimension
-    m = 32  # number of codewords
-    x_norm_max = 10
-    n = 100  # number of noise samples
-    L = int(m*(m-1)/2)  # number of codewords pairs with i<j
-    iterations = 100
-    scale_lambda = 0.1
-    etas = d*[1/d]
-    codebook_type = "Grid"
-    codeword_energy = 1
-    noise_type = "Gaussian"
-    noise_energy = 0.005
-    codebook, code_cov = utils.gen_codebook(codebook_type, m, d)
-    noise_dataset, noise_cov = utils.gen_noise_dataset(noise_type, n, d, noise_energy)
-    dataset = utils.dataset_transform(codebook, noise_dataset, m, n, d)
-    utils.plot_dataset(dataset, m, fig)
-    s = init_precision_matrix(d)
-    deltas = utils.delta_array(L, d, m, codebook)
-    partition = utils.gen_partition(d, deltas)
-    s_array = subgradient_alg(iterations, m, n, deltas, etas, d, codebook, dataset, scale_lambda, partition)
-    plot_pegasos(s_array, codebook, dataset, m, n, d)
-    log_run_info(d, m, n, codebook, iterations, scale_lambda, etas, codebook_type, codeword_energy, noise_type,
-                 noise_energy, code_cov, noise_cov)
+    if load:
+        owd = os.getcwd()
+        os.chdir("runs")
+        workdir = input("Insert load dir: ")
+        os.chdir(workdir)
+        infile = open('basic_dict', 'rb')
+        basic_dict = pickle.load(infile)
+        infile.close()
+        f = open('codebook.npy', 'rb')
+        codebook = np.load(f)
+        f.close()
+        f = open('noise_dataset.npy', 'rb')
+        noise_dataset = np.load(f)
+        f.close()
+        np.random.seed(basic_dict['seed'])
+        if load_s_array:
+            f = open('s_array.npy', 'rb')
+            s_array = np.load(f)
+            f.close()
+        os.chdir(owd)
+        utils.make_run_dir()
+    else:
+        utils.make_run_dir()
+        basic_dict = {"d": 2, "m": 32, "n": 100, "iterations": 100, "scale_lambda": 0.1, "etas": [0.5, 0.5], "seed": 8,
+                      "codebook_type": "Grid", "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.02}
+        np.random.seed(basic_dict['seed'])
+        codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d'])
+        noise_dataset, noise_cov = utils.gen_noise_dataset(basic_dict['noise_type'], basic_dict['n'], basic_dict['d'],
+                                                           basic_dict['noise_energy'])
+        basic_dict['code_cov'] = code_cov
+        basic_dict['noise_cov'] = noise_cov
+    dataset = utils.dataset_transform(codebook, noise_dataset, basic_dict['m'], basic_dict['n'], basic_dict['d'])
+    utils.plot_dataset(dataset, basic_dict['m'], fig)
+    if not load_s_array:
+        L = int(basic_dict['m'] * (basic_dict['m'] - 1) / 2)  # number of codewords pairs with i<j
+        deltas = utils.delta_array(L, basic_dict['d'], basic_dict['m'], codebook)
+        partition = utils.gen_partition(basic_dict['d'], deltas)
+        s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'], deltas, basic_dict['etas'],
+                                  basic_dict['d'], codebook, dataset, basic_dict['scale_lambda'], partition)
+    plot_pegasos(s_array, codebook, dataset, basic_dict['m'], basic_dict['n'], basic_dict['d'])
+    log_run_info(basic_dict)
+    if save:
+        save_data(codebook, noise_dataset, s_array, basic_dict)
 
 
 if __name__ == '__main__':
-    seed = 8
-    np.random.seed(seed)
+    load = True
+    load_s_array = True
+    save = False
     fig = plt.figure()
     main()
-
-
-
-

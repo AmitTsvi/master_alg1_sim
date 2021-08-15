@@ -30,11 +30,30 @@ def gen_noise_dataset(noise_type, n, d, noise_energy):
     cov = None
     if noise_type == "Gaussian":
         mu = d*[0]
-        cov_diag = np.random.normal(0, 1, size=d)
-        scaled_cov_diag = noise_energy*cov_diag/np.sum(cov_diag)
-        cov = np.diag(scaled_cov_diag)
+        cov = np.random.normal(0, 1, size=(d, d))
+        cov = np.dot(cov, cov.transpose())
+        cov_diag = cov.diagonal()
+        # scaled_cov_diag = noise_energy*cov_diag/np.sum(cov_diag)
+        # np.fill_diagonal(cov, scaled_cov_diag)
+        cov = (noise_energy/np.sum(cov_diag))*cov
         rv = multivariate_normal(mu, cov)
         return rv.rvs(n), cov  # noise samples are n x d
+    if noise_type == "Mixture":
+        n_gaussians = np.random.randint(10)
+        mixture_dist = np.abs(np.random.normal(0, 1, size=n_gaussians))
+        mixture_dist = mixture_dist/np.sum(mixture_dist)
+        mu = d * [0]
+        covs = np.random.normal(0, 1, size=(n_gaussians, d, d))
+        for i, cov in enumerate(covs):
+            cov = np.dot(cov, cov.transpose())
+            cov_diag = cov.diagonal()
+            # scaled_cov_diag = noise_energy * cov_diag / np.sum(cov_diag)
+            # np.fill_diagonal(cov, scaled_cov_diag)
+            covs[i] = (noise_energy / np.sum(cov_diag)) * cov
+        rvs = [multivariate_normal(mu, covs[i]) for i in range(n_gaussians)]
+        mixture_idx = np.random.choice(len(mixture_dist), size=n, replace=True, p=mixture_dist)
+        samples = np.array([rvs[idx].rvs(1) for idx in mixture_idx])
+        return samples, covs
 
 
 def dataset_transform(codebook, noise_dataset, m, n, d):
@@ -61,6 +80,12 @@ def delta_array(L, d, m, codebook):
         for j in range(i+1, m):
             deltas[double_to_single_index(i, j, m)] = codebook[i] - codebook[j]
     return deltas
+
+
+def get_near_psd(s):
+    eigval, eigvec = np.linalg.eig(s)
+    eigval[eigval < 0] = 0
+    return eigvec.dot(np.diag(eigval)).dot(eigvec.T)
 
 
 def double_to_single_index(i, j, m):
@@ -98,7 +123,7 @@ def plot_decoding(dataset, classification, m, n, d, t):
     ax = fig.add_subplot(111)
     ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
     for i in range(m):
-        ax.scatter(examples[np.where(classification == i), 0], examples[np.where(classification == i), 1])
+        ax.scatter(examples[np.where(classification == i), 0], examples[np.where(classification == i), 1], marker=',')
     ax.set_title("Classification")
     plt.grid()
     plt.savefig('Iteration_'+str(t).zfill(6))
