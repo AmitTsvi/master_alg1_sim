@@ -14,10 +14,15 @@ def init_precision_matrix(d):
 
 
 def plot_pegasos(s_array, codebook, dataset, m, n, d):
+    errors = []
     for t in range(len(s_array)):
         classification = utils.decode(codebook, dataset, m, n, d, s_array[t])
+        true_classification = np.array([i for i in range(m) for j in range(n)])
+        errors.append(np.sum(classification != true_classification)/(m*n))
         if t % 10 == 0:
             utils.plot_decoding(dataset, classification, m, n, d, t)
+    utils.plot_error_rate(errors)
+    return errors
 
 
 def subgradient_alg(iterations, m, n, deltas, etas, d, codebook, dataset, scale_lambda, partition):
@@ -108,7 +113,7 @@ def main():
     else:
         utils.make_run_dir()
         basic_dict = {"d": 2, "m": 32, "n": 100, "iterations": 100, "scale_lambda": 0.1, "etas": [0.5, 0.5], "seed": 8,
-                      "codebook_type": "Grid", "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.02}
+                      "codebook_type": "Grid", "codeword_energy": 1, "noise_type": "Gaussian", "noise_energy": 0.02}
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d'])
         noise_dataset, noise_cov = utils.gen_noise_dataset(basic_dict['noise_type'], basic_dict['n'], basic_dict['d'],
@@ -123,15 +128,16 @@ def main():
         partition = utils.gen_partition(basic_dict['d'], deltas)
         s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'], deltas, basic_dict['etas'],
                                   basic_dict['d'], codebook, dataset, basic_dict['scale_lambda'], partition)
-    plot_pegasos(s_array, codebook, dataset, basic_dict['m'], basic_dict['n'], basic_dict['d'])
+    errors = plot_pegasos(s_array, codebook, dataset, basic_dict['m'], basic_dict['n'], basic_dict['d'])
+    basic_dict['errors'] = errors
     log_run_info(basic_dict)
     if save:
         save_data(codebook, noise_dataset, s_array, basic_dict)
 
 
 if __name__ == '__main__':
-    load = True
-    load_s_array = True
-    save = False
+    load = False
+    load_s_array = False
+    save = True
     fig = plt.figure()
     main()

@@ -68,7 +68,7 @@ def plot_dataset(dataset, m, fig):
     ax = fig.add_subplot(111)
     ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
     for i in range(m):
-        ax.scatter(dataset[i, :, 0], dataset[i, :, 1])
+        ax.scatter(dataset[i, :, 0], dataset[i, :, 1], marker='x', s=10)
     ax.set_title("Labels")
     plt.grid()
     plt.savefig('True_Labels')
@@ -123,7 +123,8 @@ def plot_decoding(dataset, classification, m, n, d, t):
     ax = fig.add_subplot(111)
     ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
     for i in range(m):
-        ax.scatter(examples[np.where(classification == i), 0], examples[np.where(classification == i), 1], marker=',')
+        ax.scatter(examples[np.where(classification == i), 0], examples[np.where(classification == i), 1],
+                   marker='x', s=10)
     ax.set_title("Classification")
     plt.grid()
     plt.savefig('Iteration_'+str(t).zfill(6))
@@ -162,3 +163,14 @@ def make_run_dir():
     dt_string = now.strftime("%Y_%m_%d_%H%M%S")
     os.mkdir(dt_string)
     os.chdir(dt_string)
+
+
+def plot_error_rate(errors):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(errors)
+    ax.set_xlabel("Iteration")
+    ax.set_ylabel("Error Probability")
+    plt.grid()
+    plt.savefig('ErrorProbability')
+
