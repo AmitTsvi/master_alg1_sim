@@ -7,6 +7,7 @@ from numpy.linalg import matrix_rank
 from datetime import datetime
 import os
 from sympy.utilities.iterables import multiset_permutations
+import itertools
 
 
 def gen_codebook(codebook_type, m, d):
@@ -19,11 +20,14 @@ def gen_codebook(codebook_type, m, d):
         return rv.rvs(m), cov  # codebook is m x d
     if codebook_type == "Grid":
         codewords_per_axis = int(np.ceil(m**(1/d)))
-        grid = list(multiset_permutations(np.linspace(-1, 1, codewords_per_axis), d))
-        repetitions = [d*[e] for e in np.linspace(-1, 1, codewords_per_axis) if e != 0]
-        complete_grid = np.array(grid+repetitions)
-        indexlist = np.argsort(np.linalg.norm(complete_grid, axis=1))
-        return complete_grid[indexlist[:m]], None
+        # grid = list(multiset_permutations(np.linspace(-1, 1, codewords_per_axis), d))
+        # repetitions = [d*[e] for e in np.linspace(-1, 1, codewords_per_axis) if e != 0]
+        # complete_grid = np.array(grid+repetitions)
+        grid = [list(p) for p in itertools.product(np.linspace(-1, 1, codewords_per_axis), repeat=d)]
+        grid.remove(d*[0.0])
+        grid = np.array(grid)
+        indexlist = np.argsort(np.linalg.norm(grid, axis=1))
+        return grid[indexlist[:m]], None
 
 
 def gen_noise_dataset(noise_type, n, d, noise_energy):
