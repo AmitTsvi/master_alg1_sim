@@ -8,14 +8,16 @@ from datetime import datetime
 import os
 from sympy.utilities.iterables import multiset_permutations
 import itertools
+import math
 
 
 def gen_codebook(codebook_type, m, d):
     if codebook_type == "Gaussian":
         mu = d*[0]
-        cov_diag = np.random.normal(0, 1, size=d)
-        scaled_cov_diag = cov_diag/np.sum(cov_diag)
-        cov = np.diag(scaled_cov_diag)
+        cov = np.random.normal(0, 1, size=(d, d))
+        cov = np.dot(cov, cov.transpose())
+        cov_diag = cov.diagonal()
+        cov = cov / np.sum(cov_diag)
         rv = multivariate_normal(mu, cov)
         return rv.rvs(m), cov  # codebook is m x d
     if codebook_type == "Grid":
@@ -24,40 +26,65 @@ def gen_codebook(codebook_type, m, d):
         # repetitions = [d*[e] for e in np.linspace(-1, 1, codewords_per_axis) if e != 0]
         # complete_grid = np.array(grid+repetitions)
         grid = [list(p) for p in itertools.product(np.linspace(-1, 1, codewords_per_axis), repeat=d)]
-        grid.remove(d*[0.0])
+        if codewords_per_axis % 2 == 1:
+            grid.remove(d*[0.0])
         grid = np.array(grid)
         indexlist = np.argsort(np.linalg.norm(grid, axis=1))
         return grid[indexlist[:m]], None
+    if codebook_type == "Circle":
+        pi = math.pi
+        return np.array([(math.cos(2*pi/m*x), math.sin(2*pi/m*x)) for x in range(m)]), None
+    if codebook_type == "TwoCircles":
+        pi = math.pi
+        outer_words = int(2*m/3)
+        inner_words = m - outer_words
+        outer_circle = [(math.cos(2*pi/outer_words*x), math.sin(2*pi/outer_words*x)) for x in range(outer_words)]
+        inner_circle = [(0.5*math.cos(2*pi/inner_words*x), 0.5*math.sin(2*pi/inner_words*x)) for x in range(inner_words)]
+        return np.array(outer_circle+inner_circle), None
+    if codebook_type == "GridInCircle":
+        pi = math.pi
+        outer_words = int(2*m/3)
+        inner_words = m - outer_words
+        outer_circle = [(math.cos(2*pi/outer_words*x), math.sin(2*pi/outer_words*x)) for x in range(outer_words)]
+        codewords_per_axis = int(np.ceil(inner_words**(1/d)))
+        inner = [list(p) for p in itertools.product(np.linspace(-0.3, 0.3, codewords_per_axis), repeat=d)]
+        if codewords_per_axis % 2 == 1:
+            inner.remove(d*[0.0])
+        return np.array(outer_circle+inner), None
 
 
-def gen_noise_dataset(noise_type, n, d, noise_energy):
+def gen_noise_dataset(noise_type, n, d, noise_energy, noise_cov=None, mix_dist=None):
     cov = None
     if noise_type == "Gaussian":
         mu = d*[0]
-        cov = np.random.normal(0, 1, size=(d, d))
-        cov = np.dot(cov, cov.transpose())
-        cov_diag = cov.diagonal()
-        # scaled_cov_diag = noise_energy*cov_diag/np.sum(cov_diag)
-        # np.fill_diagonal(cov, scaled_cov_diag)
-        cov = (noise_energy/np.sum(cov_diag))*cov
-        rv = multivariate_normal(mu, cov)
-        return rv.rvs(n), cov  # noise samples are n x d
-    if noise_type == "Mixture":
-        n_gaussians = np.random.randint(10)
-        mixture_dist = np.abs(np.random.normal(0, 1, size=n_gaussians))
-        mixture_dist = mixture_dist/np.sum(mixture_dist)
-        mu = d * [0]
-        covs = np.random.normal(0, 1, size=(n_gaussians, d, d))
-        for i, cov in enumerate(covs):
+        if noise_cov is None:
+            cov = np.random.normal(0, 1, size=(d, d))
             cov = np.dot(cov, cov.transpose())
             cov_diag = cov.diagonal()
-            # scaled_cov_diag = noise_energy * cov_diag / np.sum(cov_diag)
-            # np.fill_diagonal(cov, scaled_cov_diag)
-            covs[i] = (noise_energy / np.sum(cov_diag)) * cov
+            cov = (noise_energy/np.sum(cov_diag))*cov
+        else:
+            cov = noise_cov
+        rv = multivariate_normal(mu, cov)
+        return rv.rvs(n), cov, None  # noise samples are n x d
+    if noise_type == "Mixture":
+        mu = d * [0]
+        if noise_cov is None:
+            n_gaussians = np.random.randint(10)
+            mixture_dist = np.abs(np.random.normal(0, 1, size=n_gaussians))
+            mixture_dist = mixture_dist / np.sum(mixture_dist)
+            covs = np.random.normal(0, 1, size=(n_gaussians, d, d))
+            for i, cov in enumerate(covs):
+                cov = np.dot(cov, cov.transpose())
+                cov_diag = cov.diagonal()
+                covs[i] = (noise_energy / np.sum(cov_diag)) * cov
+        else:
+            n_gaussians = len(noise_cov)
+            mixture_dist = mix_dist
+            covs = noise_cov
         rvs = [multivariate_normal(mu, covs[i]) for i in range(n_gaussians)]
         mixture_idx = np.random.choice(len(mixture_dist), size=n, replace=True, p=mixture_dist)
         samples = np.array([rvs[idx].rvs(1) for idx in mixture_idx])
-        return samples, covs
+        return samples, covs, mixture_dist
 
 
 def dataset_transform(codebook, noise_dataset, m, n, d):
@@ -67,7 +94,8 @@ def dataset_transform(codebook, noise_dataset, m, n, d):
     return dataset
 
 
-def plot_dataset(dataset, m, fig):
+def plot_dataset(dataset, m, snr):
+    fig = plt.figure()
     cm = plt.get_cmap('gist_rainbow')
     ax = fig.add_subplot(111)
     ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
@@ -75,7 +103,8 @@ def plot_dataset(dataset, m, fig):
         ax.scatter(dataset[i, :, 0], dataset[i, :, 1], marker='x', s=10)
     ax.set_title("Labels")
     plt.grid()
-    plt.savefig('True_Labels')
+    plt.savefig('True_Labels_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
+    plt.close()
 
 
 def delta_array(L, d, m, codebook):
@@ -113,9 +142,8 @@ def single_to_double_index(l, m):
 def decode(codebook, dataset, m, n, d, S):
     examples = dataset.reshape(m*n, d)
     classification = np.zeros(m*n)
-    iv = inv(S)
     for i, e in enumerate(examples):
-        c = np.argmin([distance.mahalanobis(e, c, iv) for c in codebook])
+        c = np.argmin([distance.mahalanobis(e, c, S) for c in codebook])
         classification[i] = c
     return classification
 
@@ -132,6 +160,7 @@ def plot_decoding(dataset, classification, m, n, d, t):
     ax.set_title("Classification")
     plt.grid()
     plt.savefig('Iteration_'+str(t).zfill(6))
+    plt.close()
 
 
 def gen_partition(d, deltas):
@@ -169,12 +198,31 @@ def make_run_dir():
     os.chdir(dt_string)
 
 
-def plot_error_rate(errors):
+def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(errors)
-    ax.set_xlabel("Iteration")
-    ax.set_ylabel("Error Probability")
+    ax.plot(train_errors, color='blue')
+    ax.plot(cov_train_errors, color='black', linestyle='dashed')
     plt.grid()
-    plt.savefig('ErrorProbability')
+    plt.savefig('Train_Error_Probability')
+    plt.close()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(test_errors, color='blue')
+    ax.plot(cov_test_errors, color='black', linestyle='dashed')
+    plt.grid()
+    plt.savefig('Test_Error_Probability')
+    plt.close()
+
+
+def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    snr_values = [1/energy for energy in snr_range]
+    ax.plot(snr_values, errors, color='blue')
+    ax.plot(snr_values, cov_errors, color='black', linestyle='dashed')
+    plt.axvline(x=1/org_snr)
+    plt.grid()
+    plt.savefig('Error_Probability_SNR')
+    plt.close()
 

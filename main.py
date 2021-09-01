@@ -13,16 +13,62 @@ def init_precision_matrix(d):
     return np.dot(a, a.T)
 
 
-def plot_pegasos(s_array, codebook, dataset, m, n, d):
-    errors = []
+def plot_pegasos(s_array, codebook, train_dataset, test_dataset, m, n, d, noise_cov, mix_dist):
+    train_errors = []
+    test_errors = []
+    train_true_classification = np.array([i for i in range(m) for j in range(n)])
+    test_true_classification = np.array([i for i in range(m) for j in range(4 * n)])
     for t in range(len(s_array)):
-        classification = utils.decode(codebook, dataset, m, n, d, s_array[t])
-        true_classification = np.array([i for i in range(m) for j in range(n)])
-        errors.append(np.sum(classification != true_classification)/(m*n))
+        train_classification = utils.decode(codebook, train_dataset, m, n, d, s_array[t])
+        test_classification = utils.decode(codebook, test_dataset, m, 4*n, d, s_array[t])
+        train_errors.append(np.sum(train_classification != train_true_classification)/(m*n))
+        test_errors.append(np.sum(test_classification != test_true_classification) / (4*m*n))
         if t % 10 == 0 and d == 2:
-            utils.plot_decoding(dataset, classification, m, n, d, t)
-    utils.plot_error_rate(errors)
-    return errors
+            utils.plot_decoding(train_dataset, train_classification, m, n, d, t)
+    if len(noise_cov.shape) == 2:
+        precision = LA.inv(noise_cov)
+    else:
+        precision = np.zeros((d, d))
+        for i in range(len(mix_dist)):
+            precision += mix_dist[i]*noise_cov[i]
+        precision = LA.inv(precision)
+    train_classification = utils.decode(codebook, train_dataset, m, n, d, precision)
+    test_classification = utils.decode(codebook, test_dataset, m, 4*n, d, precision)
+    cov_train_error = np.sum(train_classification != train_true_classification)/(m*n)
+    cov_test_error = np.sum(test_classification != test_true_classification) / (4*m*n)
+    utils.plot_error_rate(train_errors, len(s_array)*[cov_train_error], test_errors, len(s_array)*[cov_test_error])
+    return train_errors, test_errors, cov_train_error, cov_test_error
+
+
+def snr_test_plot(s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix_dist, snr_steps, org_energy):
+    datasets = []
+    low_snr = list(np.linspace(0.005, org_energy, snr_steps))[:-1]
+    high_snr = list(np.linspace(org_energy, 50*org_energy, snr_steps))
+    snr_range = low_snr+high_snr
+    for snr in snr_range:
+        if snr == org_energy:
+            datasets.append(test_dataset)
+        else:
+            new_snr_dataset, _, _ = utils.gen_noise_dataset(noise_type, 4*n, d, snr, noise_cov, mix_dist)
+            new_snr_trans = utils.dataset_transform(codebook, new_snr_dataset, m, 4*n, d)
+            datasets.append(new_snr_trans)
+    errors = []
+    cov_errors = []
+    true_classification = np.array([i for i in range(m) for j in range(4*n)])
+    if len(noise_cov.shape) == 2:
+        precision = LA.inv(noise_cov)
+    else:
+        precision = np.zeros((d, d))
+        for i in range(len(mix_dist)):
+            precision += mix_dist[i]*noise_cov[i]
+        precision = LA.inv(precision)
+    for index in range(len(snr_range)):
+        classification = utils.decode(codebook, datasets[index], m, 4*n, d, s)
+        errors.append(np.sum(classification != true_classification) / (4*m*n))
+        classification = utils.decode(codebook, datasets[index], m, 4*n, d, precision)
+        cov_errors.append(np.sum(classification != true_classification) / (4*m*n))
+        utils.plot_dataset(datasets[index], m, 1 / snr_range[index])
+    utils.plot_snr_error_rate(errors, cov_errors, snr_range, org_energy)
 
 
 def subgradient_alg(iterations, m, n, deltas, etas, d, codebook, dataset, scale_lambda, partition):
@@ -56,10 +102,11 @@ def log_run_info(basic_dict):
     file1 = open("log.txt", "w")
     file1.write("Dimension: "+str(basic_dict['d'])+"\n")
     file1.write("Number of codewords: " + str(basic_dict['m'])+"\n")
+    file1.write("Number of noise samples: " + str(basic_dict['n']) + "\n")
     file1.write("Codebook type: " + basic_dict['codebook_type'] + "\n")
-    file1.write("codewords energy: " + str(basic_dict['codeword_energy'])+"\n")
+    file1.write("Codewords maximal energy: " + str(basic_dict['codeword_energy'])+"\n")
     file1.write("Noise type: " + basic_dict['noise_type'] + "\n")
-    file1.write("codewords energy: " + str(basic_dict['noise_energy']) + "\n")
+    file1.write("Noise energy: " + str(basic_dict['noise_energy']) + "\n")
     file1.write("Number of iterations: " + str(basic_dict['iterations'])+"\n")
     file1.write("Lambda: " + str(basic_dict['scale_lambda'])+"\n")
     file1.write("Etas: " + str(basic_dict['etas'])+"\n")
@@ -70,15 +117,21 @@ def log_run_info(basic_dict):
     if basic_dict['noise_cov'] is not None:
         file1.write("Random noise covariance(s):" + "\n")
         file1.write(str(basic_dict['noise_cov']) + "\n")
+    if basic_dict['mix_dist'] is not None:
+        file1.write("Gaussian mixture distribution:" + "\n")
+        file1.write(str(basic_dict['mix_dist']) + "\n")
     file1.close()
 
 
-def save_data(codebook, noise_dataset, s_array, basic_dict):
+def save_data(codebook, noise_dataset, s_array, basic_dict, test_noise_dataset):
     f = open('codebook.npy', 'wb')
     np.save(f, codebook)
     f.close()
     f = open('noise_dataset.npy', 'wb')
     np.save(f, noise_dataset)
+    f.close()
+    f = open('test_noise_dataset.npy', 'wb')
+    np.save(f, test_noise_dataset)
     f.close()
     f = open('s_array.npy', 'wb')
     np.save(f, s_array)
@@ -103,6 +156,9 @@ def main():
         f = open('noise_dataset.npy', 'rb')
         noise_dataset = np.load(f)
         f.close()
+        f = open('test_noise_dataset.npy', 'rb')
+        test_noise_dataset = np.load(f)
+        f.close()
         np.random.seed(basic_dict['seed'])
         if load_s_array:
             f = open('s_array.npy', 'rb')
@@ -112,32 +168,59 @@ def main():
         utils.make_run_dir()
     else:
         utils.make_run_dir()
-        basic_dict = {"d": 3, "m": 124, "n": 100, "iterations": 100, "scale_lambda": 0.1, "etas": 3*[0.5], "seed": 8,
-                      "codebook_type": "Grid", "codeword_energy": 1, "noise_type": "Gaussian", "noise_energy": 0.1}
+        basic_dict = {"d": 2, "m": 24, "n": 100, "iterations": 100, "scale_lambda": 0.001, "etas": 2*[0.5], "seed": 17,
+                      "codebook_type": "GridInCircle", "codeword_energy": 1, "noise_type": "Mixture",
+                      "noise_energy": 0.02, "snr_steps": 60}
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d'])
-        noise_dataset, noise_cov = utils.gen_noise_dataset(basic_dict['noise_type'], basic_dict['n'], basic_dict['d'],
-                                                           basic_dict['noise_energy'])
         basic_dict['code_cov'] = code_cov
+        noise_dataset, noise_cov, mix_dist = utils.gen_noise_dataset(basic_dict['noise_type'], basic_dict['n'],
+                                                                     basic_dict['d'], basic_dict['noise_energy'])
         basic_dict['noise_cov'] = noise_cov
+        basic_dict['mix_dist'] = mix_dist
+        test_noise_dataset, _, _ = utils.gen_noise_dataset(basic_dict['noise_type'], 4*basic_dict['n'], basic_dict['d'],
+                                                           basic_dict['noise_energy'], noise_cov, mix_dist)
     dataset = utils.dataset_transform(codebook, noise_dataset, basic_dict['m'], basic_dict['n'], basic_dict['d'])
-    utils.plot_dataset(dataset, basic_dict['m'], fig)
+    test_dataset = utils.dataset_transform(codebook, test_noise_dataset, basic_dict['m'], 4*basic_dict['n'],
+                                           basic_dict['d'])
+    utils.plot_dataset(dataset, basic_dict['m'], 1/basic_dict['noise_energy'])
     if not load_s_array:
         L = int(basic_dict['m'] * (basic_dict['m'] - 1) / 2)  # number of codewords pairs with i<j
         deltas = utils.delta_array(L, basic_dict['d'], basic_dict['m'], codebook)
         partition = utils.gen_partition(basic_dict['d'], deltas)
         s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'], deltas, basic_dict['etas'],
                                   basic_dict['d'], codebook, dataset, basic_dict['scale_lambda'], partition)
-    errors = plot_pegasos(s_array, codebook, dataset, basic_dict['m'], basic_dict['n'], basic_dict['d'])
-    basic_dict['errors'] = errors
+    if load_errors:
+        utils.plot_error_rate(basic_dict['train_errors'], basic_dict['iterations']*basic_dict['cov_train_error'],
+                              basic_dict['test_errors'], basic_dict['iterations']*basic_dict['cov_test_error'])
+    else:
+        train_errors, test_errors, cov_train_error, cov_test_error = plot_pegasos(s_array, codebook, dataset,
+                                                                                  test_dataset, basic_dict['m'],
+                                                                                  basic_dict['n'], basic_dict['d'],
+                                                                                  basic_dict['noise_cov'],
+                                                                                  basic_dict['mix_dist'])
+        basic_dict['train_errors'] = train_errors
+        basic_dict['test_errors'] = test_errors
+        basic_dict['cov_train_error'] = cov_train_error
+        basic_dict['cov_test_error'] = cov_test_error
+    if snr_test:
+        snr_test_plot(s_array[-1], codebook, test_dataset, basic_dict['m'], basic_dict['n'], basic_dict['d'],
+                      basic_dict['noise_type'], basic_dict['noise_cov'], basic_dict['mix_dist'],
+                      basic_dict['snr_steps'], basic_dict['noise_energy'])
     log_run_info(basic_dict)
     if save:
-        save_data(codebook, noise_dataset, s_array, basic_dict)
+        save_data(codebook, noise_dataset, s_array, basic_dict, test_noise_dataset)
 
 
 if __name__ == '__main__':
     load = False
     load_s_array = False
-    save = True
+    load_errors = False
+    save = False
+    snr_test = True
+    if snr_test:
+        load = True
+        load_s_array = True
+        load_errors = True
     fig = plt.figure()
     main()
