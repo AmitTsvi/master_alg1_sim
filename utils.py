@@ -69,7 +69,7 @@ def gen_noise_dataset(noise_type, n, d, noise_energy, noise_cov=None, mix_dist=N
     if noise_type == "Mixture":
         mu = d * [0]
         if noise_cov is None:
-            n_gaussians = np.random.randint(10)
+            n_gaussians = np.random.randint(3, 10)
             mixture_dist = np.abs(np.random.normal(0, 1, size=n_gaussians))
             mixture_dist = mixture_dist / np.sum(mixture_dist)
             covs = np.random.normal(0, 1, size=(n_gaussians, d, d))
@@ -188,40 +188,45 @@ def gen_partition(d, deltas):
     return P_arr
 
 
-def make_run_dir():
+def make_run_dir(load, load_dir):
     if not os.path.exists("runs"):
         os.mkdir("runs")
     os.chdir("runs")
     now = datetime.now()
     dt_string = now.strftime("%Y_%m_%d_%H%M%S")
-    os.mkdir(dt_string)
-    os.chdir(dt_string)
+    if load:
+        fin_string = dt_string + "_load_" + load_dir
+    else:
+        fin_string = dt_string + "_save"
+    os.mkdir(fin_string)
+    os.chdir(fin_string)
 
 
 def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(train_errors, color='blue')
-    ax.plot(cov_train_errors, color='black', linestyle='dashed')
-    plt.grid()
-    plt.savefig('Train_Error_Probability')
-    plt.close()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(test_errors, color='blue')
-    ax.plot(cov_test_errors, color='black', linestyle='dashed')
-    plt.grid()
-    plt.savefig('Test_Error_Probability')
-    plt.close()
+    for i in range(2):
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        plt.ylim([0, 1])
+        plt.grid()
+        if i == 0:
+            ax.plot(train_errors, color='blue')
+            ax.plot(cov_train_errors, color='black', linestyle='dashed')
+            plt.savefig('Train_Error_Probability')
+        else:
+            ax.plot(test_errors, color='blue')
+            ax.plot(cov_test_errors, color='black', linestyle='dashed')
+            plt.savefig('Test_Error_Probability')
+        plt.close()
 
 
-def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr):
+def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr, codebook_energy):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    snr_values = [1/energy for energy in snr_range]
-    ax.plot(snr_values, errors, color='blue')
-    ax.plot(snr_values, cov_errors, color='black', linestyle='dashed')
-    plt.axvline(x=1/org_snr)
+    snr_values = [codebook_energy/energy for energy in snr_range]
+    snr_values = 10*np.log10(snr_values)
+    ax.plot(snr_values, errors, color='blue', marker='s')
+    ax.plot(snr_values, cov_errors, color='black', linestyle='dashed', marker='s')
+    plt.axvline(x=10*np.log10(codebook_energy/org_snr))
     plt.grid()
     plt.savefig('Error_Probability_SNR')
     plt.close()

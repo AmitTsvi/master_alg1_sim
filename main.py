@@ -42,9 +42,10 @@ def plot_pegasos(s_array, codebook, train_dataset, test_dataset, m, n, d, noise_
 
 def snr_test_plot(s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix_dist, snr_steps, org_energy):
     datasets = []
-    low_snr = list(np.linspace(0.005, org_energy, snr_steps))[:-1]
-    high_snr = list(np.linspace(org_energy, 50*org_energy, snr_steps))
-    snr_range = low_snr+high_snr
+    codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
+    snr_range = list(np.logspace(-2, np.log10(codebook_energy), 2*snr_steps))
+    snr_range.append(org_energy)
+    snr_range = list(np.sort(snr_range))
     for snr in snr_range:
         if snr == org_energy:
             datasets.append(test_dataset)
@@ -67,8 +68,8 @@ def snr_test_plot(s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix
         errors.append(np.sum(classification != true_classification) / (4*m*n))
         classification = utils.decode(codebook, datasets[index], m, 4*n, d, precision)
         cov_errors.append(np.sum(classification != true_classification) / (4*m*n))
-        utils.plot_dataset(datasets[index], m, 1 / snr_range[index])
-    utils.plot_snr_error_rate(errors, cov_errors, snr_range, org_energy)
+        utils.plot_dataset(datasets[index], m, 10*np.log10(codebook_energy/snr_range[index]))
+    utils.plot_snr_error_rate(errors, cov_errors, snr_range, org_energy, codebook_energy)
 
 
 def subgradient_alg(iterations, m, n, deltas, etas, d, codebook, dataset, scale_lambda, partition):
@@ -165,12 +166,12 @@ def main():
             s_array = np.load(f)
             f.close()
         os.chdir(owd)
-        utils.make_run_dir()
+        utils.make_run_dir(load, workdir)
     else:
-        utils.make_run_dir()
-        basic_dict = {"d": 2, "m": 24, "n": 100, "iterations": 100, "scale_lambda": 0.001, "etas": 2*[0.5], "seed": 17,
-                      "codebook_type": "GridInCircle", "codeword_energy": 1, "noise_type": "Mixture",
-                      "noise_energy": 0.02, "snr_steps": 60}
+        utils.make_run_dir(load, None)
+        basic_dict = {"d": 4, "m": 256, "n": 100, "iterations": 100, "scale_lambda": 0.1, "etas": 4*[0.5], "seed": 61,
+                      "codebook_type": "Grid", "codeword_energy": 1, "noise_type": "Mixture",
+                      "noise_energy": 0.05, "snr_steps": 10}
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d'])
         basic_dict['code_cov'] = code_cov
@@ -216,8 +217,8 @@ if __name__ == '__main__':
     load = False
     load_s_array = False
     load_errors = False
-    save = False
-    snr_test = True
+    save = True
+    snr_test = False
     if snr_test:
         load = True
         load_s_array = True
