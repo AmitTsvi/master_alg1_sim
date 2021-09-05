@@ -169,7 +169,7 @@ def main():
         utils.make_run_dir(load, workdir)
     else:
         utils.make_run_dir(load, None)
-        basic_dict = {"d": 4, "m": 256, "n": 100, "iterations": 100, "scale_lambda": 0.1, "etas": 4*[0.5], "seed": 61,
+        basic_dict = {"d": 4, "m": 256, "n": 100, "iterations": 100, "scale_lambda": 0.1, "etas": 4*[0.25], "seed": 61,
                       "codebook_type": "Grid", "codeword_energy": 1, "noise_type": "Mixture",
                       "noise_energy": 0.05, "snr_steps": 10}
         np.random.seed(basic_dict['seed'])
@@ -191,9 +191,10 @@ def main():
         partition = utils.gen_partition(basic_dict['d'], deltas)
         s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'], deltas, basic_dict['etas'],
                                   basic_dict['d'], codebook, dataset, basic_dict['scale_lambda'], partition)
+        print("Finished running alg, now testing")
     if load_errors:
-        utils.plot_error_rate(basic_dict['train_errors'], basic_dict['iterations']*basic_dict['cov_train_error'],
-                              basic_dict['test_errors'], basic_dict['iterations']*basic_dict['cov_test_error'])
+        utils.plot_error_rate(basic_dict['train_errors'], basic_dict['iterations']*[basic_dict['cov_train_error']],
+                              basic_dict['test_errors'], basic_dict['iterations']*[basic_dict['cov_test_error']])
     else:
         train_errors, test_errors, cov_train_error, cov_test_error = plot_pegasos(s_array, codebook, dataset,
                                                                                   test_dataset, basic_dict['m'],

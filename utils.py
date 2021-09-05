@@ -63,7 +63,8 @@ def gen_noise_dataset(noise_type, n, d, noise_energy, noise_cov=None, mix_dist=N
             cov_diag = cov.diagonal()
             cov = (noise_energy/np.sum(cov_diag))*cov
         else:
-            cov = noise_cov
+            cov_diag = noise_cov.diagonal()
+            cov = (noise_energy/np.sum(cov_diag))*noise_cov
         rv = multivariate_normal(mu, cov)
         return rv.rvs(n), cov, None  # noise samples are n x d
     if noise_type == "Mixture":
@@ -81,6 +82,9 @@ def gen_noise_dataset(noise_type, n, d, noise_energy, noise_cov=None, mix_dist=N
             n_gaussians = len(noise_cov)
             mixture_dist = mix_dist
             covs = noise_cov
+            for i, cov in enumerate(covs):
+                cov_diag = cov.diagonal()
+                covs[i] = (noise_energy / np.sum(cov_diag)) * cov
         rvs = [multivariate_normal(mu, covs[i]) for i in range(n_gaussians)]
         mixture_idx = np.random.choice(len(mixture_dist), size=n, replace=True, p=mixture_dist)
         samples = np.array([rvs[idx].rvs(1) for idx in mixture_idx])
@@ -206,15 +210,16 @@ def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors
     for i in range(2):
         fig = plt.figure()
         ax = fig.add_subplot(111)
+        ax.tick_params(labelsize='medium', width=3)
         plt.ylim([0, 1])
         plt.grid()
         if i == 0:
-            ax.plot(train_errors, color='blue')
-            ax.plot(cov_train_errors, color='black', linestyle='dashed')
+            ax.plot(train_errors, linewidth=2, color='blue')
+            ax.plot(cov_train_errors, color='black', linestyle='dashed', linewidth=2)
             plt.savefig('Train_Error_Probability')
         else:
-            ax.plot(test_errors, color='blue')
-            ax.plot(cov_test_errors, color='black', linestyle='dashed')
+            ax.plot(test_errors, linewidth=2, color='blue')
+            ax.plot(cov_test_errors, color='black', linestyle='dashed', linewidth=2)
             plt.savefig('Test_Error_Probability')
         plt.close()
 
@@ -224,8 +229,9 @@ def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr, codebook_energy)
     ax = fig.add_subplot(111)
     snr_values = [codebook_energy/energy for energy in snr_range]
     snr_values = 10*np.log10(snr_values)
-    ax.plot(snr_values, errors, color='blue', marker='s')
-    ax.plot(snr_values, cov_errors, color='black', linestyle='dashed', marker='s')
+    ax.plot(snr_values, errors, color='blue', marker='s', linewidth=2)
+    ax.plot(snr_values, cov_errors, color='black', linestyle='dashed', marker='s', linewidth=2)
+    ax.tick_params(labelsize='medium', width=3)
     plt.axvline(x=10*np.log10(codebook_energy/org_snr))
     plt.grid()
     plt.savefig('Error_Probability_SNR')
