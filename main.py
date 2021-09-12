@@ -218,8 +218,8 @@ if __name__ == '__main__':
     load = False
     load_s_array = False
     load_errors = False
-    save = True
-    snr_test = False
+    save = False
+    snr_test = True
     if snr_test:
         load = True
         load_s_array = True
