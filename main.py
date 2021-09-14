@@ -41,21 +41,19 @@ def plot_pegasos(s_array, codebook, train_dataset, test_dataset, m, n, d, noise_
 
 
 def snr_test_plot(s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix_dist, snr_steps, org_energy):
+    val_size = 10000
     datasets = []
     codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
     snr_range = list(np.logspace(-2, np.log10(codebook_energy), 2*snr_steps))
     snr_range.append(org_energy)
     snr_range = list(np.sort(snr_range))
     for snr in snr_range:
-        if snr == org_energy:
-            datasets.append(test_dataset)
-        else:
-            new_snr_dataset, _, _ = utils.gen_noise_dataset(noise_type, 4*n, d, snr, noise_cov, mix_dist)
-            new_snr_trans = utils.dataset_transform(codebook, new_snr_dataset, m, 4*n, d)
-            datasets.append(new_snr_trans)
+        new_snr_dataset, _, _ = utils.gen_noise_dataset(noise_type, val_size, d, snr, noise_cov, mix_dist)
+        new_snr_trans = utils.dataset_transform(codebook, new_snr_dataset, m, val_size, d)
+        datasets.append(new_snr_trans)
     errors = []
     cov_errors = []
-    true_classification = np.array([i for i in range(m) for j in range(4*n)])
+    true_classification = np.array([i for i in range(m) for j in range(val_size)])
     if len(noise_cov.shape) == 2:
         precision = LA.inv(noise_cov)
     else:
@@ -64,10 +62,11 @@ def snr_test_plot(s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix
             precision += mix_dist[i]*noise_cov[i]
         precision = LA.inv(precision)
     for index in range(len(snr_range)):
-        classification = utils.decode(codebook, datasets[index], m, 4*n, d, s)
-        errors.append(np.sum(classification != true_classification) / (4*m*n))
-        classification = utils.decode(codebook, datasets[index], m, 4*n, d, precision)
-        cov_errors.append(np.sum(classification != true_classification) / (4*m*n))
+        print("SNR index " + str(index) + "\n")
+        classification = utils.decode(codebook, datasets[index], m, val_size, d, s)
+        errors.append(np.sum(classification != true_classification) / (val_size*m))
+        classification = utils.decode(codebook, datasets[index], m, val_size, d, precision)
+        cov_errors.append(np.sum(classification != true_classification) / (val_size*m))
         utils.plot_dataset(datasets[index], m, 10*np.log10(codebook_energy/snr_range[index]))
     utils.plot_snr_error_rate(errors, cov_errors, snr_range, org_energy, codebook_energy)
 
@@ -76,6 +75,7 @@ def subgradient_alg(iterations, m, n, deltas, etas, d, codebook, dataset, scale_
     s_array = []
     s = np.zeros((d, d))
     for t in range(1, iterations+1):
+        print("Iteration "+str(t)+"\n")
         p_t = np.random.randint(m-1)
         q_t = np.random.randint(p_t+1, m)
         x_p_t = np.expand_dims(codebook[p_t], axis=1)
