@@ -143,12 +143,13 @@ def single_to_double_index(l, m):
     return i, j
 
 
+def decode_sample(a, codebook, S):
+    return np.argmin([distance.mahalanobis(a, c, S) for c in codebook])
+
+
 def decode(codebook, dataset, m, n, d, S):
     examples = dataset.reshape(m*n, d)
-    classification = np.zeros(m*n)
-    for i, e in enumerate(examples):
-        c = np.argmin([distance.mahalanobis(e, c, S) for c in codebook])
-        classification[i] = c
+    classification = np.apply_along_axis(decode_sample, 1, examples, codebook, S)
     return classification
 
 
