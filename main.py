@@ -41,7 +41,8 @@ def plot_pegasos(s_array, codebook, train_dataset, test_dataset, m, n, d, noise_
 
 
 def snr_test_plot(s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix_dist, snr_steps, org_energy):
-    val_size = 10000
+    np.random.seed(777)
+    val_size = 1000
     datasets = []
     codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
     snr_range = list(np.logspace(-2, np.log10(codebook_energy), 2*snr_steps))
@@ -61,12 +62,19 @@ def snr_test_plot(s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix
         for i in range(len(mix_dist)):
             precision += mix_dist[i]*noise_cov[i]
         precision = LA.inv(precision)
+    print(snr_range)
+    print(org_energy)
+    print(codebook_energy)
     for index in range(len(snr_range)):
         print("SNR index " + str(index) + "\n")
         classification = utils.decode(codebook, datasets[index], m, val_size, d, s)
-        errors.append(np.sum(classification != true_classification) / (val_size*m))
+        error = np.sum(classification != true_classification) / (val_size*m)
+        errors.append(error)
+        print(error)
         classification = utils.decode(codebook, datasets[index], m, val_size, d, precision)
-        cov_errors.append(np.sum(classification != true_classification) / (val_size*m))
+        cov_error = np.sum(classification != true_classification) / (val_size*m)
+        cov_errors.append(cov_error)
+        print(cov_error)
         utils.plot_dataset(datasets[index], m, 10*np.log10(codebook_energy/snr_range[index]))
     utils.plot_snr_error_rate(errors, cov_errors, snr_range, org_energy, codebook_energy)
 
@@ -147,6 +155,9 @@ def main():
         owd = os.getcwd()
         os.chdir("runs")
         workdir = input("Insert load dir: ")
+        org_workdir = workdir
+        if just_replot_SNR:
+            workdir = workdir.split("load_")[1]
         os.chdir(workdir)
         infile = open('basic_dict', 'rb')
         basic_dict = pickle.load(infile)
@@ -164,6 +175,18 @@ def main():
         if load_s_array:
             f = open('s_array.npy', 'rb')
             s_array = np.load(f)
+            f.close()
+        if just_replot_SNR:
+            os.chdir("..")
+            os.chdir(org_workdir)
+            f = open('SNR_errors.npy', 'rb')
+            errors = np.load(f)
+            f.close()
+            f = open('SNR_cov_errors.npy', 'rb')
+            cov_errors = np.load(f)
+            f.close()
+            f = open('SNR_range.npy', 'rb')
+            snr_range = np.load(f)
             f.close()
         os.chdir(owd)
         utils.make_run_dir(load, workdir)
@@ -210,6 +233,9 @@ def main():
                       basic_dict['noise_type'], basic_dict['noise_cov'], basic_dict['mix_dist'],
                       basic_dict['snr_steps'], basic_dict['noise_energy'])
     log_run_info(basic_dict)
+    if just_replot_SNR:
+        codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
+        utils.plot_snr_error_rate(errors, cov_errors, snr_range, basic_dict['noise_energy'], codebook_energy)
     if save:
         save_data(codebook, noise_dataset, s_array, basic_dict, test_noise_dataset)
 
@@ -219,8 +245,13 @@ if __name__ == '__main__':
     load_s_array = False
     load_errors = False
     save = False
-    snr_test = True
+    snr_test = False
     if snr_test:
+        load = True
+        load_s_array = True
+        load_errors = True
+    just_replot_SNR = True
+    if just_replot_SNR:
         load = True
         load_s_array = True
         load_errors = True
