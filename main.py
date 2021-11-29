@@ -42,7 +42,7 @@ def plot_pegasos(s_array, codebook, train_dataset, test_dataset, m, n, d, noise_
 
 def snr_test_plot(s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix_dist, snr_steps, org_energy):
     np.random.seed(777)
-    val_size = 1000
+    val_size = 10000
     datasets = []
     codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
     snr_range = list(np.logspace(-2, np.log10(codebook_energy), 2*snr_steps))
