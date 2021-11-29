@@ -105,7 +105,7 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
             return trans @ x
 
         def f_inv(y):
-            return LA.inv(trans) @ y
+            return LA.pinv(trans) @ y
 
         return f, f_inv
 
@@ -186,7 +186,7 @@ def decode_LTNN(codebook, dataset, m, n, d, H, S):
 
 
 def trans_decode(codebook, dataset, m, n, d, inv_trans):
-    decode_sample_trans = lambda a, cb, h, s: np.argmin([distance.euclidean(inv_trans(a), c) for c in cb])
+    decode_sample_trans = lambda a, cb, inv_t: np.argmin([distance.euclidean(inv_trans(a), c) for c in cb])
     classification = np.apply_along_axis(decode_sample_trans, 1, dataset, codebook, inv_trans)
     return classification
 
@@ -227,7 +227,7 @@ def gen_partition(d, deltas):
 def make_run_dir(load, load_dir):
     if not os.path.exists("runs"):
         os.mkdir("runs")
-    os.chdir("runs")
+    os.chdir("runs/LTNN")
     now = datetime.now()
     dt_string = now.strftime("%Y_%m_%d_%H%M%S")
     if load:

@@ -103,7 +103,7 @@ def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_l
 
 def log_run_info(basic_dict):
     file1 = open("log.txt", "w")
-    file1.write("Dimension: "+str(basic_dict['d'])+"\n")
+    file1.write("Dimension: "+str(basic_dict['d_x'])+"x"+str(basic_dict['d_y'])+"\n")
     file1.write("Number of codewords: " + str(basic_dict['m'])+"\n")
     file1.write("Number of noise samples: " + str(basic_dict['n']) + "\n")
     file1.write("Codebook type: " + basic_dict['codebook_type'] + "\n")
