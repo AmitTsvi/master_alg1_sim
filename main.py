@@ -192,7 +192,7 @@ def main():
         utils.make_run_dir(load, workdir)
     else:
         utils.make_run_dir(load, None)
-        basic_dict = {"d": 4, "m": 256, "n": 100, "iterations": 100, "scale_lambda": 0.1, "etas": 4*[0.25], "seed": 61,
+        basic_dict = {"d": 4, "m": 256, "n": 100, "iterations": 100, "scale_lambda": 0.1, "etas": (4+1)*[1/(4+1)], "seed": 61,
                       "codebook_type": "Grid", "codeword_energy": 1, "noise_type": "Mixture",
                       "noise_energy": 0.05, "snr_steps": 10}
         np.random.seed(basic_dict['seed'])
@@ -246,11 +246,12 @@ if __name__ == '__main__':
     load_errors = False
     save = False
     snr_test = False
+    just_replot_SNR = False
+
     if snr_test:
         load = True
         load_s_array = True
         load_errors = True
-    just_replot_SNR = True
     if just_replot_SNR:
         load = True
         load_s_array = True

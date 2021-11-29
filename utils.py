@@ -169,27 +169,20 @@ def plot_decoding(dataset, classification, m, n, d, t):
 
 
 def gen_partition(d, deltas):
-    P = []
+    basis = []
+    additional_partition = []
     for delta in deltas:
-        succ = False
-        for p_i in P:
-            p_i_pre = np.asarray(p_i)
-            rank_pre = matrix_rank(p_i_pre)
-            p_i.append(delta)
-            p_i_post = np.asarray(p_i)
-            rank_post = matrix_rank(p_i_post)
-            if rank_post == rank_pre:
-                succ = True
-                break
-        if not succ:
-            if len(P) < d:
-                new_p = [delta]
-                P.append(new_p)
-            else:
-                P[np.random.randint(d)].append(delta)
+        basis_pre = np.asarray(basis)
+        rank_pre = matrix_rank(basis_pre)
+        basis.append(delta)
+        basis_post = np.asarray(basis)
+        rank_post = matrix_rank(basis_post)
+        if rank_post == rank_pre:
+            additional_partition.append(basis.pop())
     P_arr = []
-    for p_i in P:
-        P_arr.append(np.array(p_i))
+    for vector in basis:
+        P_arr.append(np.array([vector]))
+    P_arr.append(np.array(additional_partition))
     return P_arr
 
 
