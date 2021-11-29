@@ -4,6 +4,7 @@ import numpy as np
 from scipy.spatial import distance
 from numpy.linalg import inv
 from numpy.linalg import matrix_rank
+from numpy import linalg as LA
 from datetime import datetime
 import os
 from sympy.utilities.iterables import multiset_permutations
@@ -55,12 +56,14 @@ def gen_codebook(codebook_type, m, d):
 
 def gen_noise_dataset(noise_type, n, d, noise_energy, noise_cov=None, mix_dist=None):
     cov = None
-    if noise_type == "Gaussian":
+    if noise_type in ["Gaussian", "WhiteGaussian"]:
         mu = d*[0]
         if noise_cov is None:
             cov = np.random.normal(0, 1, size=(d, d))
             cov = np.dot(cov, cov.transpose())
             cov_diag = cov.diagonal()
+            if noise_type == "WhiteGaussian":
+                cov = np.diag(cov_diag)
             cov = (noise_energy/np.sum(cov_diag))*cov
         else:
             cov_diag = noise_cov.diagonal()
@@ -91,11 +94,34 @@ def gen_noise_dataset(noise_type, n, d, noise_energy, noise_cov=None, mix_dist=N
         return samples, covs, mixture_dist
 
 
+def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
+    if trans_type == "Linear":
+        trans = np.random.rand(d_y, d_x)
+        _, sigma, _ = np.linalg.svd(trans, full_matrices=True)
+        curr_max_eigen = np.max(sigma)
+        trans = (max_eigenvalue / curr_max_eigen) * trans
+
+        def f(x):
+            return trans @ x
+
+        def f_inv(y):
+            return LA.inv(trans) @ y
+
+        return f, f_inv
+
+
 def dataset_transform(codebook, noise_dataset, m, n, d):
     dataset = np.zeros((m, n, d))  # dataset is m x n x d
     for i in range(len(codebook)):
         dataset[i] = noise_dataset + codebook[i]
     return dataset
+
+
+def dataset_transform_LTNN(codebook, noise_dataset, m, n, d, trans):
+    dataset = np.zeros((n, d))  # dataset is n x d_y
+    transformed_codewords = trans(codebook.T)  # d_y x m
+    dup_trans_codewords = np.repeat(transformed_codewords.T, int(n/m), axis=0)  # n x d_y
+    return dup_trans_codewords + noise_dataset
 
 
 def plot_dataset(dataset, m, snr):
@@ -104,7 +130,7 @@ def plot_dataset(dataset, m, snr):
     ax = fig.add_subplot(111)
     ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
     for i in range(m):
-        ax.scatter(dataset[i, :, 0], dataset[i, :, 1], marker='x', s=10)
+        ax.scatter(dataset[i:(i+1)*int(len(dataset)/m)-1][0], dataset[i:(i+1)*int(len(dataset)/m)-1][1], marker='x', s=10)
     ax.set_title("Labels")
     plt.grid()
     plt.savefig('True_Labels_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
@@ -150,6 +176,18 @@ def decode_sample(a, codebook, S):
 def decode(codebook, dataset, m, n, d, S):
     examples = dataset.reshape(m*n, d)
     classification = np.apply_along_axis(decode_sample, 1, examples, codebook, S)
+    return classification
+
+
+def decode_LTNN(codebook, dataset, m, n, d, H, S):
+    decode_sample_LTNN = lambda a, cb, h, s: np.argmax([np.dot(a, h@c)-0.5*c.T@s@c for c in cb])
+    classification = np.apply_along_axis(decode_sample_LTNN, 1, dataset, codebook, H, S)
+    return classification
+
+
+def trans_decode(codebook, dataset, m, n, d, inv_trans):
+    decode_sample_trans = lambda a, cb, h, s: np.argmin([distance.euclidean(inv_trans(a), c) for c in cb])
+    classification = np.apply_along_axis(decode_sample_trans, 1, dataset, codebook, inv_trans)
     return classification
 
 
