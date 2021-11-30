@@ -107,7 +107,17 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
         def f_inv(y):
             return LA.pinv(trans) @ y
 
-        return f, f_inv
+    if trans_type == "Identity":
+
+        def f(x):
+            return np.pad(x, ((0, d_y-d_x), (0, 0)), 'constant')
+
+        def f_inv(y):
+            if d_x == d_y:
+                return y
+            return y[:-(d_y-d_x)][:]
+
+    return f, f_inv
 
 
 def dataset_transform(codebook, noise_dataset, m, n, d):
@@ -119,18 +129,20 @@ def dataset_transform(codebook, noise_dataset, m, n, d):
 
 def dataset_transform_LTNN(codebook, noise_dataset, m, n, d, trans):
     dataset = np.zeros((n, d))  # dataset is n x d_y
-    transformed_codewords = trans(codebook.T)  # d_y x m
+    transformed_codewords = trans(codebook.T)  # d_x x m
     dup_trans_codewords = np.repeat(transformed_codewords.T, int(n/m), axis=0)  # n x d_y
     return dup_trans_codewords + noise_dataset
 
 
-def plot_dataset(dataset, m, snr):
+def plot_dataset(dataset, m, snr, codebook):
     fig = plt.figure()
     cm = plt.get_cmap('gist_rainbow')
     ax = fig.add_subplot(111)
     ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
     for i in range(m):
-        ax.scatter(dataset[i:(i+1)*int(len(dataset)/m)-1][0], dataset[i:(i+1)*int(len(dataset)/m)-1][1], marker='x', s=10)
+        ax.scatter(codebook[i][0], codebook[i][1], marker='o', s=50)
+        ax.scatter(dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 0],
+                   dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 1], marker='x', s=10)
     ax.set_title("Labels")
     plt.grid()
     plt.savefig('True_Labels_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
@@ -193,12 +205,11 @@ def trans_decode(codebook, dataset, m, n, d, inv_trans):
 
 def plot_decoding(dataset, classification, m, n, d, t):
     fig = plt.figure()
-    examples = dataset.reshape(m * n, d)
     cm = plt.get_cmap('gist_rainbow')
     ax = fig.add_subplot(111)
     ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
     for i in range(m):
-        ax.scatter(examples[np.where(classification == i), 0], examples[np.where(classification == i), 1],
+        ax.scatter(dataset[np.where(classification == i), 0], dataset[np.where(classification == i), 1],
                    marker='x', s=10)
     ax.set_title("Classification")
     plt.grid()
