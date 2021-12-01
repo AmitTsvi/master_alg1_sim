@@ -13,7 +13,7 @@ def init_precision_matrix(d):
     return np.dot(a, a.T)
 
 
-def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, m, n, test_n, d, noise_cov, mix_dist, inv_trans):
+def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, m, n, test_n, d, noise_cov, mix_dist, inv_trans, lambda_scale=None):
     train_errors = []
     test_errors = []
     iteration_gap = 100
@@ -24,19 +24,19 @@ def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, m, n, 
         test_classification = utils.decode_LTNN(codebook, test_dataset, m, test_n, d, h_array[t], s_array[t])
         train_errors.append(np.sum(train_classification != train_true_classification)/n)
         test_errors.append(np.sum(test_classification != test_true_classification)/test_n)
-        if t % 10 == 0 and d == 2:
+        if t % 10 == 0 and d == 2 and not lambda_sweep:
             utils.plot_decoding(train_dataset, train_classification, m, n, d, t)
     train_classification = utils.trans_decode(codebook, train_dataset, m, n, d, inv_trans)
     test_classification = utils.trans_decode(codebook, test_dataset, m, test_n, d, inv_trans)
     trans_train_error = np.sum(train_classification != train_true_classification)/n
     trans_test_error = np.sum(test_classification != test_true_classification)/test_n
-    utils.plot_error_rate(train_errors, int(len(s_array)/iteration_gap)*[trans_train_error], test_errors, int(len(s_array)/iteration_gap)*[trans_test_error])
+    utils.plot_error_rate(train_errors, int(len(s_array)/iteration_gap)*[trans_train_error], test_errors, int(len(s_array)/iteration_gap)*[trans_test_error], lambda_scale)
     return train_errors, test_errors, trans_train_error, trans_test_error
 
 
 def snr_test_plot(h, s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix_dist, snr_steps, org_energy, snr_seed, trans, inv_trans):
     np.random.seed(snr_seed)
-    val_size = 16000
+    val_size = 4000
     datasets = []
     codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
     snr_range = list(np.logspace(-2, np.log10(codebook_energy), 2*snr_steps))
@@ -94,10 +94,15 @@ def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_l
             grad_s_t += etas[i] * (s @ delta_s @ delta_s.T + delta_s @ delta_s.T @ s)
         grad_h_t = scale_lambda*grad_h_t - v_h_t/(m-1)
         grad_s_t = scale_lambda*grad_s_t + 0.25*v_s_t/(m - 1)
-        h -= (1 / (scale_lambda * t)) * grad_h_t
-        s -= (1/(scale_lambda*t))*grad_s_t
+        if scale_lambda == 0:
+            h -= (1/t)*grad_h_t
+            s -= (1/t)*grad_s_t
+        else:
+            h -= (1 / (scale_lambda * t)) * grad_h_t
+            s -= (1/(scale_lambda*t))*grad_s_t
         s = utils.get_near_psd(s)
-        s = np.eye(2)
+        h = np.eye(2)
+        # s = np.eye(2)
         h_array.append(h)
         s_array.append(s)
     return h_array, s_array
@@ -186,20 +191,26 @@ def main():
             f.close()
         os.chdir(owd)
         utils.make_run_dir(load, workdir)
+        channel_trans, inv_channel_trans = utils.rebuild_trans_from_kernel(basic_dict['trans_kernel'],
+                                                                           basic_dict['inv_trans_kernel'],
+                                                                           basic_dict['trans_type'])
     else:
         utils.make_run_dir(load, None)
         d_x = 2
         d_y = 2
-        basic_dict = {"d_x": d_x, "d_y": d_y, "m": 16, "n": 1600, "test_n_ratio": 4, "iterations": 16000, "scale_lambda": 1,
+        basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 800, "test_n_ratio": 4, "iterations": 8000, "scale_lambda": 0.01,
                       "etas": (d_x+1)*[1/(d_x+1)], "seed": 61, "codebook_type": "Grid", "codeword_energy": 1,
-                      "noise_type": "WhiteGaussian", "noise_energy": 0.04, "snr_steps": 10, "snr_seed": 777, "trans_type": "Identity", "max_eigenvalue": 0.1}
+                      "noise_type": "WhiteGaussian", "noise_energy": 0.03, "snr_steps": 10, "snr_seed": 777,
+                      "trans_type": "Identity", "max_eigenvalue": 0.1, "lambda_range": [-4, -3]}
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d_x'])
         basic_dict['code_cov'] = code_cov
-        channel_trans, inv_channel_trans = utils.gen_transformation(basic_dict['d_x'], basic_dict['d_y'],
-                                                                    basic_dict['trans_type'], basic_dict['max_eigenvalue'])
-        basic_dict['channel_trans'] = channel_trans
-        basic_dict['inv_channel_trans'] = inv_channel_trans
+        channel_trans, inv_channel_trans, trans_kernel, inv_trans_kernel = utils.gen_transformation(basic_dict['d_x'],
+                                                                                                    basic_dict['d_y'],
+                                                                                                    basic_dict['trans_type'],
+                                                                                                    basic_dict['max_eigenvalue'])
+        basic_dict['trans_kernel'] = trans_kernel
+        basic_dict['inv_trans_kernel'] = inv_trans_kernel
         noise_dataset, noise_cov, mix_dist = utils.gen_noise_dataset(basic_dict['noise_type'], basic_dict['n'],
                                                                      basic_dict['d_y'], basic_dict['noise_energy'])
         basic_dict['noise_cov'] = noise_cov
@@ -207,18 +218,31 @@ def main():
         test_noise_dataset, _, _ = utils.gen_noise_dataset(basic_dict['noise_type'], 4*basic_dict['n'], basic_dict['d_y'],
                                                            basic_dict['noise_energy'], noise_cov, mix_dist)
     train_dataset = utils.dataset_transform_LTNN(codebook, noise_dataset, basic_dict['m'], basic_dict['n'],
-                                                 basic_dict['d_y'], basic_dict['channel_trans'])
+                                                 basic_dict['d_y'], channel_trans)
     test_dataset = utils.dataset_transform_LTNN(codebook, test_noise_dataset, basic_dict['m'],
                                                 basic_dict["test_n_ratio"]*basic_dict['n'], basic_dict['d_y'],
-                                                basic_dict['channel_trans'])
+                                                channel_trans)
     utils.plot_dataset(train_dataset, basic_dict['m'], 1/basic_dict['noise_energy'], codebook)
     if not load_s_array:
         L = int(basic_dict['m'] * (basic_dict['m'] - 1) / 2)  # number of codewords pairs with i<j
         deltas = utils.delta_array(L, basic_dict['d_x'], basic_dict['m'], codebook)
         partition = utils.gen_partition(basic_dict['d_x'], deltas)
-        h_array, s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'], basic_dict['etas'],
-                                  basic_dict['d_x'], basic_dict['d_y'], codebook, test_dataset, basic_dict['scale_lambda'], partition)
-        print("Finished running alg, now testing")
+        if lambda_sweep:
+            for lambda_i in np.logspace(basic_dict["lambda_range"][0], basic_dict["lambda_range"][1], 50):
+                h_array, s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'],
+                                                   basic_dict['etas'], basic_dict['d_x'], basic_dict['d_y'], codebook,
+                                                   test_dataset, lambda_i, partition)
+                print("Finished running alg, now testing")
+                _, _, _, _ = plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, basic_dict['m'],
+                                          basic_dict['n'], basic_dict['n'] * basic_dict['test_n_ratio'],
+                                          basic_dict['d_y'], basic_dict['noise_cov'], basic_dict['mix_dist'],
+                                          inv_channel_trans, lambda_i)
+        else:
+            h_array, s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'],
+                                               basic_dict['etas'],
+                                               basic_dict['d_x'], basic_dict['d_y'], codebook, test_dataset,
+                                               basic_dict['scale_lambda'], partition)
+            print("Finished running alg, now testing")
     if load_errors:
         utils.plot_error_rate(basic_dict['train_errors'], basic_dict['iterations']*[basic_dict['cov_train_error']],
                               basic_dict['test_errors'], basic_dict['iterations']*[basic_dict['cov_test_error']])
@@ -227,7 +251,7 @@ def main():
                                                                                   test_dataset, basic_dict['m'],
                                                                                   basic_dict['n'], basic_dict['n']*basic_dict['test_n_ratio'], basic_dict['d_y'],
                                                                                   basic_dict['noise_cov'],
-                                                                                  basic_dict['mix_dist'], basic_dict['inv_channel_trans'])
+                                                                                  basic_dict['mix_dist'], inv_channel_trans)
         basic_dict['train_errors'] = train_errors
         basic_dict['test_errors'] = test_errors
         basic_dict['cov_train_error'] = cov_train_error
@@ -235,7 +259,7 @@ def main():
     if snr_test:
         snr_test_plot(h_array[-1], s_array[-1], codebook, test_dataset, basic_dict['m'], basic_dict['n'], basic_dict['d'],
                       basic_dict['noise_type'], basic_dict['noise_cov'], basic_dict['mix_dist'],
-                      basic_dict['snr_steps'], basic_dict['noise_energy'], basic_dict["snr_seed"], basic_dict['channel_trans'], basic_dict['inv_channel_trans'])
+                      basic_dict['snr_steps'], basic_dict['noise_energy'], basic_dict["snr_seed"], channel_trans, inv_channel_trans)
     log_run_info(basic_dict)
     if just_replot_SNR:
         codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
@@ -251,6 +275,7 @@ if __name__ == '__main__':
     save = True
     snr_test = False
     just_replot_SNR = False
+    lambda_sweep = True
 
     if snr_test:
         load = True

@@ -104,18 +104,38 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
         def f(x):
             return trans @ x
 
+        f_kernel = trans
+
         def f_inv(y):
             return LA.pinv(trans) @ y
+
+        f_inv_kernel = LA.pinv(trans)
 
     if trans_type == "Identity":
 
         def f(x):
             return np.pad(x, ((0, d_y-d_x), (0, 0)), 'constant')
 
+        f_kernel = np.pad(np.eye(d_x), ((0, d_y-d_x), (0, 0)), 'constant')
+
         def f_inv(y):
             if d_x == d_y:
                 return y
             return y[:-(d_y-d_x)][:]
+
+        f_inv_kernel = np.pad(np.eye(d_x), ((0, 0), (0, d_y-d_x)), 'constant')
+
+    return f, f_inv, f_kernel, f_inv_kernel
+
+
+def rebuild_trans_from_kernel(f_kernel, f_inv_kernel, trans_type):
+    if trans_type in ["Linear", "identity"]:
+
+        def f(x):
+            return f_kernel @ x
+
+        def f_inv(y):
+            return f_inv_kernel @ y
 
     return f, f_inv
 
@@ -128,7 +148,6 @@ def dataset_transform(codebook, noise_dataset, m, n, d):
 
 
 def dataset_transform_LTNN(codebook, noise_dataset, m, n, d, trans):
-    dataset = np.zeros((n, d))  # dataset is n x d_y
     transformed_codewords = trans(codebook.T)  # d_x x m
     dup_trans_codewords = np.repeat(transformed_codewords.T, int(n/m), axis=0)  # n x d_y
     return dup_trans_codewords + noise_dataset
@@ -249,7 +268,7 @@ def make_run_dir(load, load_dir):
     os.chdir(fin_string)
 
 
-def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors):
+def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors, lambda_scale=None):
     for i in range(2):
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -259,11 +278,11 @@ def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors
         if i == 0:
             ax.plot(train_errors, linewidth=2, color='blue')
             ax.plot(cov_train_errors, color='black', linestyle='dashed', linewidth=2)
-            plt.savefig('Train_Error_Probability')
+            plt.savefig('Train_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         else:
             ax.plot(test_errors, linewidth=2, color='blue')
             ax.plot(cov_test_errors, color='black', linestyle='dashed', linewidth=2)
-            plt.savefig('Test_Error_Probability')
+            plt.savefig('Test_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         plt.close()
 
 
