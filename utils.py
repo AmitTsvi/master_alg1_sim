@@ -210,8 +210,11 @@ def decode(codebook, dataset, m, n, d, S):
     return classification
 
 
+def decode_sample_LTNN(a, cb, h, s):
+    return np.argmax([a.T @ h @ c - 0.5 * c.T @ s @ c for c in cb])
+
+
 def decode_LTNN(codebook, dataset, m, n, d, H, S):
-    decode_sample_LTNN = lambda a, cb, h, s: np.argmax([np.dot(a, h@c)-0.5*c.T@s@c for c in cb])
     classification = np.apply_along_axis(decode_sample_LTNN, 1, dataset, codebook, H, S)
     return classification
 
@@ -313,5 +316,24 @@ def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr, codebook_energy)
     f = open('SNR_range.npy', 'wb')
     np.save(f, snr_range)
     f.close()
+
+
+def plot_indicator(lto, lambda_range):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(np.logspace(lambda_range[0], lambda_range[1], 50), lto, color='blue', marker='s', linewidth=2)
+    plt.grid()
+    plt.savefig('plot_indicator')
+    plt.close()
+
+
+def plot_norms(h_array, s_array, scale_lambda):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot([LA.norm(h) for h in h_array], color='blue', marker='s', linewidth=2)
+    ax.plot([LA.norm(s) for s in s_array], color='red', marker='s', linewidth=2)
+    plt.grid()
+    plt.savefig('h_norm_blue_s_norm_red_'+str(scale_lambda).replace(".", "_"))
+    plt.close()
 
 
