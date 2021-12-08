@@ -71,8 +71,10 @@ def snr_test_plot(h, s, codebook, test_dataset, m, n, d, noise_type, noise_cov, 
 def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_lambda, partition, batch_size):
     s_array = []
     h_array = []
-    s = np.zeros((d_x, d_x))
-    h = np.zeros((d_y, d_x))
+    s = init_precision_matrix(d_x)
+    h = init_precision_matrix(d_x)
+    # s = np.zeros((d_x, d_x))
+    # h = np.zeros((d_y, d_x))
     less_than_one = 0
     print("Starting algorithm run with "+str(scale_lambda))
     for t in range(1, iterations+1):
@@ -98,8 +100,8 @@ def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_l
             grad_h_t += etas[i] * 2 * (h @ delta_h @ delta_h.T)
             delta_s = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
             grad_s_t += etas[i] * (s @ delta_s @ delta_s.T + delta_s @ delta_s.T @ s)
-        grad_h_t = scale_lambda[0]*grad_h_t - v_h_t/(batch_size*(m-1))
-        grad_s_t = scale_lambda[1]*grad_s_t + 0.25*v_s_t/(batch_size*(m-1))
+        grad_h_t = scale_lambda[0]*grad_h_t - 3*v_h_t/(batch_size*(m-1))
+        grad_s_t = scale_lambda[1]*grad_s_t + 3*0.25*v_s_t/(batch_size*(m-1))
         if scale_lambda[0] == 0 or scale_lambda[1] == 0:
             h -= (1/t)*grad_h_t
             s -= (1/t)*grad_s_t
@@ -109,11 +111,11 @@ def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_l
         # s_norm_pre = LA.norm(s)
         s = utils.get_near_psd(s)
         # h = np.eye(2)
-        s = np.eye(2)
+        # s = np.eye(2)
         # if LA.norm(h) != 0:
         #     h = h * np.sqrt(LA.norm(s)/s_norm_pre)
-        if LA.norm(h) != 0:
-            h = h / LA.norm(h)
+        # if LA.norm(h) != 0:
+        #     h = h / LA.norm(h)
         # h = h * max(min(LA.norm(h), 1.5), 0.5)/LA.norm(h)
         # if LA.norm(s) != 0:
         #     s = s * max(min(LA.norm(s), 1.5), 0.5)/LA.norm(s)
@@ -148,7 +150,7 @@ def log_run_info(basic_dict):
     file1.close()
 
 
-def save_data(codebook, noise_dataset, s_array, basic_dict, test_noise_dataset):
+def save_data(codebook, noise_dataset, s_array, basic_dict, test_noise_dataset, h_array):
     f = open('codebook.npy', 'wb')
     np.save(f, codebook)
     f.close()
@@ -164,6 +166,9 @@ def save_data(codebook, noise_dataset, s_array, basic_dict, test_noise_dataset):
     outfile = open("basic_dict", 'wb')
     pickle.dump(basic_dict, outfile)
     outfile.close()
+    f = open('h_array.npy', 'wb')
+    np.save(f, h_array)
+    f.close()
 
 
 def main():
@@ -214,7 +219,7 @@ def main():
         d_x = 2
         d_y = 2
         basic_dict = {"d_x": d_x, "d_y": d_y, "m": 4, "n": 400, "test_n_ratio": 4, "iterations": 40000,
-                      "scale_lambda": (0, 0),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 61, "codebook_type": "Grid",
+                      "scale_lambda": (0.1, 0.1),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 61, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.03, "snr_steps": 10,
                       "snr_seed": 777, "trans_type": "Identity", "max_eigenvalue": 0.1, "lambda_range": [-2, 1],
                       "batch_size": 1}
@@ -250,7 +255,7 @@ def main():
             for lambda_i in log_range:
                 h_array, s_array, lto = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'],
                                                    basic_dict['etas'], basic_dict['d_x'], basic_dict['d_y'], codebook,
-                                                   test_dataset, (lambda_i, lambda_i), partition, basic_dict["batch_size"])
+                                                   train_dataset, (lambda_i, lambda_i), partition, basic_dict["batch_size"])
                 lto_arr.append(lto)
                 print("Finished running alg, now testing")
                 _, _, _, _ = plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, basic_dict['m'],
@@ -261,7 +266,7 @@ def main():
         else:
             h_array, s_array, _ = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'],
                                                basic_dict['etas'],
-                                               basic_dict['d_x'], basic_dict['d_y'], codebook, test_dataset,
+                                               basic_dict['d_x'], basic_dict['d_y'], codebook, train_dataset,
                                                basic_dict['scale_lambda'], partition, basic_dict["batch_size"])
             print("Finished running alg, now testing")
     if load_errors:
@@ -286,7 +291,7 @@ def main():
         codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
         utils.plot_snr_error_rate(errors, cov_errors, snr_range, basic_dict['noise_energy'], codebook_energy)
     if save:
-        save_data(codebook, noise_dataset, s_array, basic_dict, test_noise_dataset)
+        save_data(codebook, noise_dataset, s_array, basic_dict, test_noise_dataset, h_array)
 
 
 if __name__ == '__main__':
@@ -296,7 +301,7 @@ if __name__ == '__main__':
     save = True
     snr_test = False
     just_replot_SNR = False
-    lambda_sweep = True
+    lambda_sweep = False
 
     if snr_test:
         load = True
