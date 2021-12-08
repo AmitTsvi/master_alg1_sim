@@ -59,12 +59,13 @@ def gen_noise_dataset(noise_type, n, d, noise_energy, noise_cov=None, mix_dist=N
     if noise_type in ["Gaussian", "WhiteGaussian"]:
         mu = d*[0]
         if noise_cov is None:
-            cov = np.random.normal(0, 1, size=(d, d))
-            cov = np.dot(cov, cov.transpose())
-            cov_diag = cov.diagonal()
             if noise_type == "WhiteGaussian":
-                cov = np.diag(cov_diag)
-            cov = (noise_energy/np.sum(cov_diag))*cov
+                cov = (noise_energy/d)*np.eye(d)
+            else:
+                cov = np.random.normal(0, 1, size=(d, d))
+                cov = np.dot(cov, cov.transpose())
+                cov_diag = cov.diagonal()
+                cov = (noise_energy/np.sum(cov_diag))*cov
         else:
             cov_diag = noise_cov.diagonal()
             cov = (noise_energy/np.sum(cov_diag))*noise_cov
@@ -95,11 +96,20 @@ def gen_noise_dataset(noise_type, n, d, noise_energy, noise_cov=None, mix_dist=N
 
 
 def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
-    if trans_type == "Linear":
+    if trans_type == "Linear_Invertible" and d_x != d_y:
+        print("Asking for invertible non-square matrix")
+        exit()
+    if trans_type in ["Linear", "Linear_Invertible"]:
         trans = np.random.rand(d_y, d_x)
-        _, sigma, _ = np.linalg.svd(trans, full_matrices=True)
-        curr_max_eigen = np.max(sigma)
+        if trans_type == "Linear_Invertible":
+            trans = trans.T @ trans
+            trans = trans + trans.T
+        u, s, vh = np.linalg.svd(trans, full_matrices=True)
+        curr_max_eigen = np.max(s)
         trans = (max_eigenvalue / curr_max_eigen) * trans
+        u, s, vh = np.linalg.svd(trans, full_matrices=True)
+        s[s < 0.5] = 0.5
+        trans = np.dot(u[:, :d_x] * s, vh)
 
         def f(x):
             return trans @ x
@@ -147,25 +157,37 @@ def dataset_transform(codebook, noise_dataset, m, n, d):
     return dataset
 
 
-def dataset_transform_LTNN(codebook, noise_dataset, m, n, d, trans):
+def dataset_transform_LTNN(codebook, noise_dataset, m, n, trans):
     transformed_codewords = trans(codebook.T)  # d_x x m
     dup_trans_codewords = np.repeat(transformed_codewords.T, int(n/m), axis=0)  # n x d_y
     return dup_trans_codewords + noise_dataset
 
 
-def plot_dataset(dataset, m, snr, codebook):
-    fig = plt.figure()
-    cm = plt.get_cmap('gist_rainbow')
-    ax = fig.add_subplot(111)
-    ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
-    for i in range(m):
-        ax.scatter(codebook[i][0], codebook[i][1], marker='o', s=50)
-        ax.scatter(dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 0],
-                   dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 1], marker='x', s=10)
-    ax.set_title("Labels")
-    plt.grid()
-    plt.savefig('True_Labels_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
-    plt.close()
+def plot_dataset(dataset, m, snr, codebook, inv_trans):
+    for j in range(2):
+        fig = plt.figure()
+        cm = plt.get_cmap('gist_rainbow')
+        ax = fig.add_subplot(111)
+        ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
+        for i in range(m):
+            ax.scatter(codebook[i][0], codebook[i][1], marker='o', s=50)
+        ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
+        if j == 0:
+            for i in range(m):
+                ax.scatter(dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 0],
+                           dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 1], marker='x', s=10)
+        else:
+            for i in range(m):
+                inv_tans_dataset = np.array(dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)])
+                inv_tans_dataset = inv_trans(inv_tans_dataset.T)
+                inv_tans_dataset = inv_tans_dataset.T
+                ax.scatter(inv_tans_dataset[:, 0], inv_tans_dataset[:, 1], marker='x', s=10)
+        plt.grid()
+        if j == 0:
+            plt.savefig('Codebook_and_samples_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
+        else:
+            plt.savefig('Codebook_and_inv_transformed_samples_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
+        plt.close()
 
 
 def delta_array(L, d, m, codebook):
@@ -239,7 +261,7 @@ def plot_decoding(dataset, classification, m, n, d, t):
     plt.close()
 
 
-def gen_partition(d, deltas):
+def gen_partition(deltas):
     basis = []
     additional_partition = []
     for delta in deltas:
@@ -271,20 +293,21 @@ def make_run_dir(load, load_dir):
     os.chdir(fin_string)
 
 
-def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors, lambda_scale=None):
+def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors, lambda_scale=None, iter_gap=1):
     for i in range(2):
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.tick_params(labelsize='medium', width=3)
         plt.yscale('log')
         plt.grid()
+        iter_axis = [iter_gap*j for j in range(len(train_errors))]
         if i == 0:
-            ax.plot(train_errors, linewidth=2, color='blue')
-            ax.plot(cov_train_errors, color='black', linestyle='dashed', linewidth=2)
+            ax.plot(iter_axis, train_errors, linewidth=2, color='blue')
+            ax.plot(iter_axis, cov_train_errors, color='black', linestyle='dashed', linewidth=2)
             plt.savefig('Train_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         else:
-            ax.plot(test_errors, linewidth=2, color='blue')
-            ax.plot(cov_test_errors, color='black', linestyle='dashed', linewidth=2)
+            ax.plot(iter_axis, test_errors, linewidth=2, color='blue')
+            ax.plot(iter_axis, cov_test_errors, color='black', linestyle='dashed', linewidth=2)
             plt.savefig('Test_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         plt.close()
 
