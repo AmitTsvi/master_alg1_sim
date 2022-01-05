@@ -26,8 +26,8 @@ def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, m, n, 
         test_classification = utils.decode_LTNN(codebook, test_dataset, m, test_n, d, h_array[t], s_array[t])
         train_errors.append(np.sum(train_classification != train_true_classification)/n)
         test_errors.append(np.sum(test_classification != test_true_classification)/test_n)
-        # if t % 10 == 0 and d == 2 and not lambda_sweep:
-        #     utils.plot_decoding(train_dataset, train_classification, m, n, d, t)
+        if t % 200 == 0 and d == 2 and not lambda_sweep:
+            utils.plot_decoding(train_dataset, train_classification, m, n, d, t)
     train_classification = utils.trans_decode(codebook, train_dataset, m, n, d, inv_trans)
     test_classification = utils.trans_decode(codebook, test_dataset, m, test_n, d, inv_trans)
     trans_train_error = np.sum(train_classification != train_true_classification)/n
@@ -207,9 +207,9 @@ def main():
         d_x = 2
         d_y = 2
         basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 800, "test_n_ratio": 4, "iterations": 8000,
-                      "scale_lambda": (10**-2, 10**-2),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
+                      "scale_lambda": (0.002, 0.002),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.02, "snr_steps": 10,
-                      "snr_seed": 777, "trans_type": "Linear_Invertible", "max_eigenvalue": 0.01, "lambda_range": [-3, 0],
+                      "snr_seed": 777, "trans_type": "Rotate", "max_eigenvalue": 0.01, "lambda_range": [-3, 0],
                       "batch_size": 1}
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d_x'])
@@ -286,7 +286,7 @@ if __name__ == '__main__':
     save = True
     snr_test = False
     just_replot_SNR = False
-    lambda_sweep = True
+    lambda_sweep = False
 
     if snr_test:
         load = True

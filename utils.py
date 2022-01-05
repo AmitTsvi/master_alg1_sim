@@ -99,7 +99,7 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
     if trans_type == "Linear_Invertible" and d_x != d_y:
         print("Asking for invertible non-square matrix")
         exit()
-    if trans_type in ["Linear", "Linear_Invertible"]:
+    if trans_type in ["Linear", "Linear_Invertible", "Rotate"]:
         trans = np.random.rand(d_y, d_x)
         if trans_type == "Linear_Invertible":
             trans = trans.T @ trans
@@ -110,6 +110,9 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
         u, s, vh = np.linalg.svd(trans, full_matrices=True)
         s[s < 0.5] = 0.5
         trans = np.dot(u[:, :d_x] * s, vh)
+        if trans_type == "Rotate" and d_x == 2 and d_y == 2:
+            sigma1 = np.random.uniform(0.5, 1)
+            trans = [[0, -sigma1], [sigma1, 0]]
 
         def f(x):
             return trans @ x
