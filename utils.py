@@ -10,6 +10,7 @@ import os
 from sympy.utilities.iterables import multiset_permutations
 import itertools
 import math
+import cvxpy as cp
 
 
 def gen_codebook(codebook_type, m, d):
@@ -235,12 +236,12 @@ def decode(codebook, dataset, m, n, d, S):
     return classification
 
 
-def decode_sample_LTNN(a, cb, h, s):
-    return np.argmax([a.T @ h @ c - 0.5 * c.T @ s @ c for c in cb])
+def decode_sample_LTNN(a, cb, h):
+    return np.argmin([LA.norm(a - h @ c) for c in cb])
 
 
-def decode_LTNN(codebook, dataset, m, n, d, H, S):
-    classification = np.apply_along_axis(decode_sample_LTNN, 1, dataset, codebook, H, S)
+def decode_LTNN(codebook, dataset, m, n, d, H):
+    classification = np.apply_along_axis(decode_sample_LTNN, 1, dataset, codebook, H)
     return classification
 
 
@@ -363,3 +364,55 @@ def plot_norms(h_array, s_array, scale_lambda):
     plt.close()
 
 
+def projection(h1, s1):
+    # h2 = np.copy(h1)
+    # x = cp.Variable(s1.shape, PSD=True)
+    # obj = cp.Minimize(cp.trace(0.5*(x.T@x)+x.T@(h2.T@h2-s1)))
+    # constraints = [x >> 0]
+    # prob = cp.Problem(obj, constraints)
+    # prob.solve()
+
+    # h2 = np.copy(h1)
+    # s2 = cp.Variable(s1.shape, PSD=True)
+    # obj = cp.Minimize(cp.trace(s2.T@s2-2*(s1.T@s2)))
+    # constraints = [s2-h2.T@h2 >> 0]
+    # prob = cp.Problem(obj, constraints)
+    # prob.solve()
+
+    # s2 = np.copy(s1)
+    # h2 = cp.Variable(h1.shape)
+    # obj = cp.Minimize(cp.trace(h2.T@h2-2*(h1.T@h2)))
+    # constraints = [s2-h2.T@h2 >> 0]
+    # prob = cp.Problem(obj, constraints)
+    # prob.solve()
+
+    # h2 = cp.Variable(h1.shape)
+    # s2 = cp.Variable(s1.shape, PSD=True)
+    # obj = cp.Minimize(cp.trace(h2.T@h2-2*(h1.T@h2)+s2.T@s2-2*(s1.T@s2)))
+    # constraints = [s2-h2.T@h2 >> 0]
+    # prob = cp.Problem(obj, constraints)
+    # prob.solve()
+
+    # SOLVABLE
+    h2 = np.copy(h1)
+    s2 = cp.Variable(s1.shape, PSD=True)
+    obj = cp.Minimize(cp.norm(s2 - s1, 'fro'))
+    constraints = [s2-h2.T@h2 >> 0]
+    prob = cp.Problem(obj, constraints)
+    prob.solve(solver=cp.SCS)
+
+    # s2 = np.copy(s1)
+    # h2 = cp.Variable(h1.shape)
+    # obj = cp.Minimize(cp.norm(h2 - h1, 'fro'))
+    # constraints = [s2-h2.T@h2 >> 0]
+    # prob = cp.Problem(obj, constraints)
+    # prob.solve(solver=cp.SCS)
+
+    # h2 = cp.Variable(h1.shape)
+    # s2 = cp.Variable(s1.shape, PSD=True)
+    # obj = cp.Minimize(cp.square(cp.norm(s2 - s1, 'fro'))+cp.square(cp.norm(h2 - h1, 'fro')))
+    # constraints = [s2-h2.T@h2 >> 0]
+    # prob = cp.Problem(obj, constraints)
+    # prob.solve(solver=cp.SCS)
+
+    return h2, s2.value

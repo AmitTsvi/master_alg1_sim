@@ -22,8 +22,8 @@ def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, m, n, 
     train_true_classification = np.repeat(np.array([i for i in range(m)]), int(n/m), axis=0)
     test_true_classification = np.repeat(np.array([i for i in range(m)]), int(test_n/m), axis=0)
     for t in range(0, len(s_array), iteration_gap):
-        train_classification = utils.decode_LTNN(codebook, train_dataset, m, n, d, h_array[t], s_array[t])
-        test_classification = utils.decode_LTNN(codebook, test_dataset, m, test_n, d, h_array[t], s_array[t])
+        train_classification = utils.decode_LTNN(codebook, train_dataset, m, n, d, h_array[t])
+        test_classification = utils.decode_LTNN(codebook, test_dataset, m, test_n, d, h_array[t])
         train_errors.append(np.sum(train_classification != train_true_classification)/n)
         test_errors.append(np.sum(test_classification != test_true_classification)/test_n)
         if t % 200 == 0 and d == 2 and not lambda_sweep:
@@ -47,7 +47,7 @@ def snr_test_plot(h, s, codebook, test_dataset, m, n, d, noise_type, noise_cov, 
     snr_range = list(np.sort(snr_range))
     for snr in snr_range:
         new_snr_dataset, _, _ = utils.gen_noise_dataset(noise_type, val_size, d, snr, noise_cov, mix_dist)
-        new_snr_trans = utils.dataset_transform_LTNN(codebook, new_snr_dataset, m, val_size, d, trans)
+        new_snr_trans = utils.dataset_transform_LTNN(codebook, new_snr_dataset, m, val_size, trans)
         datasets.append(new_snr_trans)
     errors = []
     trans_errors = []
@@ -104,7 +104,8 @@ def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_l
         else:
             h -= (1/(scale_lambda[0]*t))*grad_h_t
             s -= (1/(scale_lambda[1]*t))*grad_s_t
-        s = utils.get_near_psd(s)
+        # s = utils.get_near_psd(s)
+        h, s = utils.projection(h, s)
         h_array.append(np.copy(h))
         s_array.append(np.copy(s))
     utils.plot_norms(h_array, s_array, scale_lambda)
@@ -207,9 +208,9 @@ def main():
         d_x = 2
         d_y = 2
         basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 800, "test_n_ratio": 4, "iterations": 8000,
-                      "scale_lambda": (0.002, 0.002),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
+                      "scale_lambda": (0.01, 0.01),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.02, "snr_steps": 10,
-                      "snr_seed": 777, "trans_type": "Rotate", "max_eigenvalue": 0.01, "lambda_range": [-3, 0],
+                      "snr_seed": 777, "trans_type": "Rotate", "max_eigenvalue": 0.01, "lambda_range": [-1, 1],
                       "batch_size": 1}
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d_x'])
@@ -286,7 +287,7 @@ if __name__ == '__main__':
     save = True
     snr_test = False
     just_replot_SNR = False
-    lambda_sweep = False
+    lambda_sweep = True
 
     if snr_test:
         load = True
