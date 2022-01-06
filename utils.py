@@ -394,12 +394,12 @@ def projection(h1, s1):
     # prob.solve()
 
     # SOLVABLE
-    h2 = np.copy(h1)
-    s2 = cp.Variable(s1.shape, PSD=True)
-    obj = cp.Minimize(cp.norm(s2 - s1, 'fro'))
-    constraints = [s2-h2.T@h2 >> 0]
-    prob = cp.Problem(obj, constraints)
-    prob.solve(solver=cp.SCS)
+    # h2 = np.copy(h1)
+    # s2 = cp.Variable(s1.shape, PSD=True)
+    # obj = cp.Minimize(cp.norm(s2 - s1, 'fro'))
+    # constraints = [s2-h2.T@h2 >> 0]
+    # prob = cp.Problem(obj, constraints)
+    # prob.solve(solver=cp.SCS)
 
     # s2 = np.copy(s1)
     # h2 = cp.Variable(h1.shape)
@@ -408,11 +408,16 @@ def projection(h1, s1):
     # prob = cp.Problem(obj, constraints)
     # prob.solve(solver=cp.SCS)
 
-    # h2 = cp.Variable(h1.shape)
-    # s2 = cp.Variable(s1.shape, PSD=True)
-    # obj = cp.Minimize(cp.square(cp.norm(s2 - s1, 'fro'))+cp.square(cp.norm(h2 - h1, 'fro')))
+    h2 = cp.Variable(h1.shape)
+    s2 = cp.Variable(s1.shape, PSD=True)
+    obj = cp.Minimize(cp.square(cp.norm(s2 - s1, 'fro'))+cp.square(cp.norm(h2 - h1, 'fro')))
+    LMI1 = cp.bmat([
+        [np.eye(s2.shape[0]), h2],
+        [h2.T, s2]
+    ])
+    constraints = [LMI1 >> 0]
     # constraints = [s2-h2.T@h2 >> 0]
-    # prob = cp.Problem(obj, constraints)
-    # prob.solve(solver=cp.SCS)
+    prob = cp.Problem(obj, constraints)
+    prob.solve(solver=cp.SCS)
 
-    return h2, s2.value
+    return h2.value, s2.value

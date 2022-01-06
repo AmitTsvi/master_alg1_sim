@@ -208,7 +208,7 @@ def main():
         d_x = 2
         d_y = 2
         basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 800, "test_n_ratio": 4, "iterations": 8000,
-                      "scale_lambda": (0.01, 0.01),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
+                      "scale_lambda": (0.6, 0.6),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.02, "snr_steps": 10,
                       "snr_seed": 777, "trans_type": "Rotate", "max_eigenvalue": 0.01, "lambda_range": [-1, 1],
                       "batch_size": 1}
@@ -287,7 +287,7 @@ if __name__ == '__main__':
     save = True
     snr_test = False
     just_replot_SNR = False
-    lambda_sweep = True
+    lambda_sweep = False
 
     if snr_test:
         load = True
