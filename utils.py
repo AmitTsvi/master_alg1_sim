@@ -143,7 +143,7 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
 
 
 def rebuild_trans_from_kernel(f_kernel, f_inv_kernel, trans_type):
-    if trans_type in ["Linear", "identity"]:
+    if trans_type in ["Linear", "identity", "Rotate"]:
 
         def f(x):
             return f_kernel @ x
@@ -332,7 +332,7 @@ def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr, codebook_energy)
     plt.yscale('log')
     # plt.ylim([-10**-7, 1])
     plt.grid()
-    plt.savefig('Error_Probability_SNR', dpi=300)
+    plt.savefig('Error_Probability_SNR')
     plt.close()
     f = open('SNR_errors.npy', 'wb')
     np.save(f, errors)

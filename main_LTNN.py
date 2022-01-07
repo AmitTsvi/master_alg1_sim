@@ -8,6 +8,7 @@ from numpy import linalg as LA
 import utils
 import pickle
 import os
+from operator import add
 
 
 def init_precision_matrix(d):
@@ -18,7 +19,7 @@ def init_precision_matrix(d):
 def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, m, n, test_n, d, inv_trans, lambda_scale=None):
     train_errors = []
     test_errors = []
-    iteration_gap = 10
+    iteration_gap = 1
     train_true_classification = np.repeat(np.array([i for i in range(m)]), int(n/m), axis=0)
     test_true_classification = np.repeat(np.array([i for i in range(m)]), int(test_n/m), axis=0)
     for t in range(0, len(s_array), iteration_gap):
@@ -26,7 +27,7 @@ def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, m, n, 
         test_classification = utils.decode_LTNN(codebook, test_dataset, m, test_n, d, h_array[t])
         train_errors.append(np.sum(train_classification != train_true_classification)/n)
         test_errors.append(np.sum(test_classification != test_true_classification)/test_n)
-        if t % 200 == 0 and d == 2 and not lambda_sweep:
+        if t % 40 == 0 and d == 2 and not lambda_sweep:
             utils.plot_decoding(train_dataset, train_classification, m, n, d, t)
     train_classification = utils.trans_decode(codebook, train_dataset, m, n, d, inv_trans)
     test_classification = utils.trans_decode(codebook, test_dataset, m, test_n, d, inv_trans)
@@ -37,36 +38,41 @@ def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, m, n, 
     return train_errors, test_errors, trans_train_error, trans_test_error
 
 
-def snr_test_plot(h, s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix_dist, snr_steps, org_energy, snr_seed, trans, inv_trans):
+def snr_test_plot(h, codebook, m, d, noise_type, noise_cov, mix_dist, snr_range, org_energy, snr_seed, trans, inv_trans, codebook_energy):
     np.random.seed(snr_seed)
     val_size = 4000
-    datasets = []
-    codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
-    snr_range = list(np.logspace(-2, np.log10(codebook_energy), 2*snr_steps))
-    snr_range.append(org_energy)
-    snr_range = list(np.sort(snr_range))
-    for snr in snr_range:
-        new_snr_dataset, _, _ = utils.gen_noise_dataset(noise_type, val_size, d, snr, noise_cov, mix_dist)
-        new_snr_trans = utils.dataset_transform_LTNN(codebook, new_snr_dataset, m, val_size, trans)
-        datasets.append(new_snr_trans)
-    errors = []
-    trans_errors = []
-    true_classification = np.repeat(np.array([i for i in range(m)]), int(val_size/m), axis=0)
-    print(snr_range)
-    print(org_energy)
-    print(codebook_energy)
-    for index in range(len(snr_range)):
-        print("SNR index " + str(index) + "\n")
-        classification = utils.decode_LTNN(codebook, datasets[index], m, val_size, d, h, s)
-        error = np.sum(classification != true_classification) / val_size
-        errors.append(error)
-        print(error)
-        classification = utils.trans_decode(codebook, datasets[index], m, val_size, d, inv_trans)
-        trans_error = np.sum(classification != true_classification) / val_size
-        trans_errors.append(trans_error)
-        print(trans_error)
-        utils.plot_dataset(datasets[index], m, 10*np.log10(codebook_energy/snr_range[index]))
-    utils.plot_snr_error_rate(errors, trans_errors, snr_range, org_energy, codebook_energy)
+    n_cycles = 20
+    total_errors = np.zeros(len(snr_range))
+    total_trans_errors = np.zeros(len(snr_range))
+    for i in range(n_cycles):
+        print("SNR Test Number "+str(i))
+        datasets = []
+        for snr in snr_range:
+            new_snr_dataset, _, _ = utils.gen_noise_dataset(noise_type, val_size, d, snr, noise_cov, mix_dist)
+            new_snr_trans = utils.dataset_transform_LTNN(codebook, new_snr_dataset, m, val_size, trans)
+            datasets.append(new_snr_trans)
+        errors = np.zeros(len(snr_range))
+        trans_errors = np.zeros(len(snr_range))
+        true_classification = np.repeat(np.array([i for i in range(m)]), int(val_size/m), axis=0)
+        # print(snr_range)
+        # print(org_energy)
+        for index in range(len(snr_range)):
+            print("SNR index " + str(index) + "\n")
+            classification = utils.decode_LTNN(codebook, datasets[index], m, val_size, d, h)
+            error = np.sum(classification != true_classification) / val_size
+            errors[index] = error
+            # print(error)
+            classification = utils.trans_decode(codebook, datasets[index], m, val_size, d, inv_trans)
+            trans_error = np.sum(classification != true_classification) / val_size
+            trans_errors[index] = trans_error
+            if i == 0:
+                utils.plot_dataset(datasets[index], m, 10*np.log10(codebook_energy/snr_range[index]), codebook, inv_trans)
+        total_errors += errors
+        total_trans_errors += trans_errors
+    total_errors = total_errors/n_cycles
+    total_trans_errors = total_trans_errors/n_cycles
+    utils.plot_snr_error_rate(total_errors, total_trans_errors, snr_range, org_energy, codebook_energy)
+    return total_errors, total_trans_errors
 
 
 def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_lambda, partition, batch_size):
@@ -186,6 +192,9 @@ def main():
             f = open('s_array.npy', 'rb')
             s_array = np.load(f)
             f.close()
+            f = open('h_array.npy', 'rb')
+            h_array = np.load(f)
+            f.close()
         if just_replot_SNR:
             os.chdir("..")
             os.chdir(org_workdir)
@@ -207,10 +216,10 @@ def main():
         utils.make_run_dir(load, None)
         d_x = 2
         d_y = 2
-        basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 800, "test_n_ratio": 4, "iterations": 8000,
-                      "scale_lambda": (0.6, 0.6),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
+        basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 160, "test_n_ratio": 4, "iterations": 800,
+                      "scale_lambda": (0.25, 0.25),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.02, "snr_steps": 10,
-                      "snr_seed": 777, "trans_type": "Rotate", "max_eigenvalue": 0.01, "lambda_range": [-1, 1],
+                      "snr_seed": 777, "trans_type": "Rotate", "max_eigenvalue": 0.01, "lambda_range": [-1, 0],
                       "batch_size": 1}
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d_x'])
@@ -268,13 +277,18 @@ def main():
         basic_dict['test_errors'] = test_errors
         basic_dict['cov_train_error'] = cov_train_error
         basic_dict['cov_test_error'] = cov_test_error
+    codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
+    snr_range = list(np.logspace(-2, np.log10(codebook_energy), 2*basic_dict['snr_steps']))
+    snr_range.append(basic_dict['noise_energy'])
+    snr_range = list(np.sort(snr_range))
     if snr_test:
-        snr_test_plot(h_array[-1], s_array[-1], codebook, test_dataset, basic_dict['m'], basic_dict['n'], basic_dict['d'],
-                      basic_dict['noise_type'], basic_dict['noise_cov'], basic_dict['mix_dist'],
-                      basic_dict['snr_steps'], basic_dict['noise_energy'], basic_dict["snr_seed"], channel_trans, inv_channel_trans)
+        errors, trans_errors = snr_test_plot(h_array[-1], codebook, basic_dict['m'], basic_dict['d_y'],
+                                             basic_dict['noise_type'], basic_dict['noise_cov'], basic_dict['mix_dist'],
+                                             snr_range, basic_dict['noise_energy'], basic_dict["snr_seed"],
+                                             channel_trans, inv_channel_trans, codebook_energy)
     log_run_info(basic_dict)
     if just_replot_SNR:
-        codebook_energy = np.mean(np.sum(np.power(codebook, 2), axis=1))
+
         utils.plot_snr_error_rate(errors, cov_errors, snr_range, basic_dict['noise_energy'], codebook_energy)
     if save:
         save_data(codebook, noise_dataset, s_array, basic_dict, test_noise_dataset, h_array)
@@ -285,7 +299,7 @@ if __name__ == '__main__':
     load_s_array = False
     load_errors = False
     save = True
-    snr_test = False
+    snr_test = True
     just_replot_SNR = False
     lambda_sweep = False
 
