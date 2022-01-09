@@ -96,10 +96,11 @@ def gen_noise_dataset(noise_type, n, d, noise_energy, noise_cov=None, mix_dist=N
         return samples, covs, mixture_dist
 
 
-def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
+def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):
     if trans_type == "Linear_Invertible" and d_x != d_y:
         print("Asking for invertible non-square matrix")
         exit()
+
     if trans_type in ["Linear", "Linear_Invertible", "Rotate"]:
         trans = np.random.rand(d_y, d_x)
         if trans_type == "Linear_Invertible":
@@ -109,10 +110,10 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
         curr_max_eigen = np.max(s)
         trans = (max_eigenvalue / curr_max_eigen) * trans
         u, s, vh = np.linalg.svd(trans, full_matrices=True)
-        s[s < 0.5] = 0.5
+        s[s < min_eigenvalue] = min_eigenvalue
         trans = np.dot(u[:, :d_x] * s, vh)
         if trans_type == "Rotate" and d_x == 2 and d_y == 2:
-            sigma1 = np.random.uniform(0.5, 1)
+            sigma1 = np.random.uniform(min_eigenvalue, max_eigenvalue)
             trans = [[0, -sigma1], [sigma1, 0]]
 
         def f(x):
@@ -123,7 +124,17 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
         def f_inv(y):
             return LA.pinv(trans) @ y
 
-        f_inv_kernel = LA.pinv(trans)
+    if trans_type in ["Quadratic"]:
+        _, _, a = gen_transformation(d_x, d_y, "Rotate", max_eigenvalue, min_eigenvalue)
+        _, _, b = gen_transformation(d_x, d_y, "Linear", 0.2*max_eigenvalue, 0.2*min_eigenvalue)
+
+        def f(x):
+            return a @ x + b @ x**2
+
+        f_kernel = (a, b)
+
+        def f_inv(y, cb):
+            return np.argmin([distance.euclidean(a@c+b@c**2, y) for c in cb])
 
     if trans_type == "Identity":
 
@@ -137,19 +148,25 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue):
                 return y
             return y[:-(d_y-d_x)][:]
 
-        f_inv_kernel = np.pad(np.eye(d_x), ((0, 0), (0, d_y-d_x)), 'constant')
-
-    return f, f_inv, f_kernel, f_inv_kernel
+    return f, f_inv, f_kernel
 
 
-def rebuild_trans_from_kernel(f_kernel, f_inv_kernel, trans_type):
+def rebuild_trans_from_kernel(f_kernel, trans_type):
     if trans_type in ["Linear", "identity", "Rotate"]:
 
         def f(x):
             return f_kernel @ x
 
-        def f_inv(y):
-            return f_inv_kernel @ y
+        def f_inv(y, cb):
+            return np.argmin([distance.euclidean(f_kernel@c, y) for c in cb])
+
+    if trans_type in ["Quadratic"]:
+
+        def f(x):
+            return f_kernel[0] @ x + f_kernel[1] @ x**2
+
+        def f_inv(y, cb):
+            return np.argmin([distance.euclidean(f_kernel[0]@c+f_kernel[1]@c**2, y) for c in cb])
 
     return f, f_inv
 
@@ -168,7 +185,7 @@ def dataset_transform_LTNN(codebook, noise_dataset, m, n, trans):
 
 
 def plot_dataset(dataset, m, snr, codebook, inv_trans):
-    for j in range(2):
+    for j in range(1):
         fig = plt.figure()
         cm = plt.get_cmap('gist_rainbow')
         ax = fig.add_subplot(111)
@@ -245,9 +262,8 @@ def decode_LTNN(codebook, dataset, m, n, d, H):
     return classification
 
 
-def trans_decode(codebook, dataset, m, n, d, inv_trans):
-    decode_sample_trans = lambda a, cb, inv_t: np.argmin([distance.euclidean(inv_trans(a), c) for c in cb])
-    classification = np.apply_along_axis(decode_sample_trans, 1, dataset, codebook, inv_trans)
+def trans_decode(codebook, dataset, inv_trans):
+    classification = np.apply_along_axis(inv_trans, 1, dataset, codebook)
     return classification
 
 
@@ -365,49 +381,6 @@ def plot_norms(h_array, s_array, scale_lambda):
 
 
 def projection(h1, s1):
-    # h2 = np.copy(h1)
-    # x = cp.Variable(s1.shape, PSD=True)
-    # obj = cp.Minimize(cp.trace(0.5*(x.T@x)+x.T@(h2.T@h2-s1)))
-    # constraints = [x >> 0]
-    # prob = cp.Problem(obj, constraints)
-    # prob.solve()
-
-    # h2 = np.copy(h1)
-    # s2 = cp.Variable(s1.shape, PSD=True)
-    # obj = cp.Minimize(cp.trace(s2.T@s2-2*(s1.T@s2)))
-    # constraints = [s2-h2.T@h2 >> 0]
-    # prob = cp.Problem(obj, constraints)
-    # prob.solve()
-
-    # s2 = np.copy(s1)
-    # h2 = cp.Variable(h1.shape)
-    # obj = cp.Minimize(cp.trace(h2.T@h2-2*(h1.T@h2)))
-    # constraints = [s2-h2.T@h2 >> 0]
-    # prob = cp.Problem(obj, constraints)
-    # prob.solve()
-
-    # h2 = cp.Variable(h1.shape)
-    # s2 = cp.Variable(s1.shape, PSD=True)
-    # obj = cp.Minimize(cp.trace(h2.T@h2-2*(h1.T@h2)+s2.T@s2-2*(s1.T@s2)))
-    # constraints = [s2-h2.T@h2 >> 0]
-    # prob = cp.Problem(obj, constraints)
-    # prob.solve()
-
-    # SOLVABLE
-    # h2 = np.copy(h1)
-    # s2 = cp.Variable(s1.shape, PSD=True)
-    # obj = cp.Minimize(cp.norm(s2 - s1, 'fro'))
-    # constraints = [s2-h2.T@h2 >> 0]
-    # prob = cp.Problem(obj, constraints)
-    # prob.solve(solver=cp.SCS)
-
-    # s2 = np.copy(s1)
-    # h2 = cp.Variable(h1.shape)
-    # obj = cp.Minimize(cp.norm(h2 - h1, 'fro'))
-    # constraints = [s2-h2.T@h2 >> 0]
-    # prob = cp.Problem(obj, constraints)
-    # prob.solve(solver=cp.SCS)
-
     h2 = cp.Variable(h1.shape)
     s2 = cp.Variable(s1.shape, PSD=True)
     obj = cp.Minimize(cp.square(cp.norm(s2 - s1, 'fro'))+cp.square(cp.norm(h2 - h1, 'fro')))
