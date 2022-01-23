@@ -306,13 +306,11 @@ def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors
 def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr, codebook_energy):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    snr_values = [codebook_energy/energy for energy in snr_range]
-    snr_values = 10*np.log10(snr_values)
-    print(snr_values)
+    print(snr_range)
     print(errors)
     print(cov_errors)
-    ax.plot(snr_values, errors, color='blue', marker='s', linewidth=2, label=r'$H_T$')
-    ax.plot(snr_values, cov_errors, color='black', linestyle='dashed', marker='s', linewidth=2, label=r'$f(\cdot)$')
+    ax.plot(snr_range, errors, color='blue', marker='s', linewidth=2, label=r'$H_T$')
+    ax.plot(snr_range, cov_errors, color='black', linestyle='dashed', marker='s', linewidth=2, label=r'$f(\cdot)$')
     ax.tick_params(labelsize='medium', width=3)
     plt.axvline(x=10*np.log10(codebook_energy/org_snr))
     plt.legend()

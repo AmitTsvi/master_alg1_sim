@@ -44,11 +44,12 @@ def snr_test_plot(h, codebook, m, d, noise_type, noise_cov, mix_dist, snr_range,
     n_cycles = 20
     total_errors = np.zeros(len(snr_range))
     total_trans_errors = np.zeros(len(snr_range))
+    noise_energy_range = [codebook_energy*10**(-s/10) for s in snr_range]
     for i in range(n_cycles):
         print("SNR Test Number "+str(i))
         datasets = []
-        for snr in snr_range:
-            new_snr_dataset, _, _ = utils.gen_noise_dataset(noise_type, val_size, d, snr, noise_cov, mix_dist)
+        for n_energy in noise_energy_range:
+            new_snr_dataset, _, _ = utils.gen_noise_dataset(noise_type, val_size, d, n_energy, noise_cov, mix_dist)
             new_snr_trans = utils.dataset_transform_LTNN(codebook, new_snr_dataset, m, val_size, trans)
             datasets.append(new_snr_trans)
         errors = np.zeros(len(snr_range))
@@ -66,7 +67,7 @@ def snr_test_plot(h, codebook, m, d, noise_type, noise_cov, mix_dist, snr_range,
             trans_error = np.sum(classification != true_classification) / val_size
             trans_errors[index] = trans_error
             if i == 0:
-                utils.plot_dataset(datasets[index], m, 10*np.log10(codebook_energy/snr_range[index]), codebook)
+                utils.plot_dataset(datasets[index], m, snr_range[index], codebook)
         total_errors += errors
         total_trans_errors += trans_errors
     total_errors = total_errors/n_cycles
@@ -217,10 +218,10 @@ def main():
         d_x = 2
         d_y = 2
         basic_dict = {"d_x": d_x, "d_y": d_y, "m": 16, "n": 160, "test_n_ratio": 4, "iterations": 1600,
-                      "scale_lambda": (0.31, 0.31),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
-                      "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.012, "snr_steps": 10,
+                      "scale_lambda": (0.25, 0.25),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
+                      "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.005, "snr_steps": 10,
                       "snr_seed": 6, "trans_type": "Quadratic", "max_eigenvalue": 1, "min_eigenvalue": 0.5,
-                      "lambda_range": [-0.5, -0.1], "batch_size": 1}
+                      "lambda_range": [-1, -0.5], "batch_size": 1}
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d_x'])
         basic_dict['code_cov'] = code_cov
@@ -279,8 +280,8 @@ def main():
         basic_dict['test_errors'] = test_errors
         basic_dict['cov_train_error'] = cov_train_error
         basic_dict['cov_test_error'] = cov_test_error
-    snr_range = list(np.logspace(-2, np.log10(basic_dict['code_energy']), 2*basic_dict['snr_steps']))
-    snr_range.append(basic_dict['noise_energy'])
+    snr_range = list(np.linspace(basic_dict['train_snr']-10, basic_dict['train_snr']+10, 2*basic_dict['snr_steps']))
+    snr_range.append(basic_dict['train_snr'])
     snr_range = list(np.sort(snr_range))
     if snr_test:
         errors, trans_errors = snr_test_plot(h_array[-1], codebook, basic_dict['m'], basic_dict['d_y'],
