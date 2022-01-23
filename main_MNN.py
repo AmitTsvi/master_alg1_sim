@@ -75,7 +75,7 @@ def snr_test_plot(s, codebook, test_dataset, m, n, d, noise_type, noise_cov, mix
         cov_error = np.sum(classification != true_classification) / (val_size*m)
         cov_errors.append(cov_error)
         print(cov_error)
-        utils.plot_dataset(datasets[index], m, 10*np.log10(codebook_energy/snr_range[index]))
+        utils.plot_dataset(datasets[index], m, 10*np.log10(codebook_energy/snr_range[index]), codebook)
     utils.plot_snr_error_rate(errors, cov_errors, snr_range, org_energy, codebook_energy)
 
 
@@ -189,9 +189,9 @@ def main():
             snr_range = np.load(f)
             f.close()
         os.chdir(owd)
-        utils.make_run_dir(load, workdir)
+        utils.make_run_dir(load, workdir, "MNN")
     else:
-        utils.make_run_dir(load, None)
+        utils.make_run_dir(load, None, "MNN")
         basic_dict = {"d": 4, "m": 256, "n": 100, "iterations": 100, "scale_lambda": 0.1, "etas": (4+1)*[1/(4+1)], "seed": 61,
                       "codebook_type": "Grid", "codeword_energy": 1, "noise_type": "Mixture",
                       "noise_energy": 0.05, "snr_steps": 10}
@@ -207,11 +207,11 @@ def main():
     dataset = utils.dataset_transform(codebook, noise_dataset, basic_dict['m'], basic_dict['n'], basic_dict['d'])
     test_dataset = utils.dataset_transform(codebook, test_noise_dataset, basic_dict['m'], 4*basic_dict['n'],
                                            basic_dict['d'])
-    utils.plot_dataset(dataset, basic_dict['m'], 1/basic_dict['noise_energy'])
+    utils.plot_dataset(dataset, basic_dict['m'], 1/basic_dict['noise_energy'], basic_dict['codebook'])
     if not load_s_array:
         L = int(basic_dict['m'] * (basic_dict['m'] - 1) / 2)  # number of codewords pairs with i<j
         deltas = utils.delta_array(L, basic_dict['d'], basic_dict['m'], codebook)
-        partition = utils.gen_partition(basic_dict['d'], deltas)
+        partition = utils.gen_partition(basic_dict['d'])
         s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'], deltas, basic_dict['etas'],
                                   basic_dict['d'], codebook, dataset, basic_dict['scale_lambda'], partition)
         print("Finished running alg, now testing")

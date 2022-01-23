@@ -106,12 +106,12 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):
         if trans_type == "Linear_Invertible":
             trans = trans.T @ trans
             trans = trans + trans.T
-        u, s, vh = np.linalg.svd(trans, full_matrices=True)
+        u, s, vh = np.linalg.svd(trans, full_matrices=False)
         curr_max_eigen = np.max(s)
         trans = (max_eigenvalue / curr_max_eigen) * trans
-        u, s, vh = np.linalg.svd(trans, full_matrices=True)
+        u, s, vh = np.linalg.svd(trans, full_matrices=False)
         s[s < min_eigenvalue] = min_eigenvalue
-        trans = np.dot(u[:, :d_x] * s, vh)
+        trans = np.dot(u * s, vh)
         if trans_type == "Rotate" and d_x == 2 and d_y == 2:
             sigma1 = np.random.uniform(min_eigenvalue, max_eigenvalue)
             trans = [[0, -sigma1], [sigma1, 0]]
@@ -121,20 +121,17 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):
 
         f_kernel = trans
 
-        def f_inv(y):
-            return LA.pinv(trans) @ y
-
     if trans_type in ["Quadratic"]:
-        _, _, a = gen_transformation(d_x, d_y, "Rotate", max_eigenvalue, min_eigenvalue)
-        _, _, b = gen_transformation(d_x, d_y, "Linear", 0.2*max_eigenvalue, 0.2*min_eigenvalue)
+        _, a = gen_transformation(d_x, d_y, "Rotate", max_eigenvalue, min_eigenvalue)
+        _, b = gen_transformation(d_x**2, d_y, "Linear", 0.2*max_eigenvalue, 0.2*min_eigenvalue)
 
         def f(x):
-            return a @ x + b @ x**2
+            x_1 = np.expand_dims(x, 1)
+            x_2 = np.expand_dims((x_1@x_1.T).flatten(), 1)
+            res = a @ x_1 + b @ x_2
+            return np.squeeze(res)
 
         f_kernel = (a, b)
-
-        def f_inv(y, cb):
-            return np.argmin([distance.euclidean(a@c+b@c**2, y) for c in cb])
 
     if trans_type == "Identity":
 
@@ -143,32 +140,22 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):
 
         f_kernel = np.pad(np.eye(d_x), ((0, d_y-d_x), (0, 0)), 'constant')
 
-        def f_inv(y):
-            if d_x == d_y:
-                return y
-            return y[:-(d_y-d_x)][:]
-
-    return f, f_inv, f_kernel
+    return f, f_kernel
 
 
 def rebuild_trans_from_kernel(f_kernel, trans_type):
     if trans_type in ["Linear", "identity", "Rotate"]:
-
         def f(x):
             return f_kernel @ x
 
-        def f_inv(y, cb):
-            return np.argmin([distance.euclidean(f_kernel@c, y) for c in cb])
-
     if trans_type in ["Quadratic"]:
-
         def f(x):
-            return f_kernel[0] @ x + f_kernel[1] @ x**2
+            x_1 = np.expand_dims(x, 1)
+            x_2 = np.expand_dims((x_1@x_1.T).flatten(), 1)
+            res = f_kernel[0] @ x_1 + f_kernel[1] @ x_2
+            return np.squeeze(res)
 
-        def f_inv(y, cb):
-            return np.argmin([distance.euclidean(f_kernel[0]@c+f_kernel[1]@c**2, y) for c in cb])
-
-    return f, f_inv
+    return f
 
 
 def dataset_transform(codebook, noise_dataset, m, n, d):
@@ -179,36 +166,25 @@ def dataset_transform(codebook, noise_dataset, m, n, d):
 
 
 def dataset_transform_LTNN(codebook, noise_dataset, m, n, trans):
-    transformed_codewords = trans(codebook.T)  # d_x x m
-    dup_trans_codewords = np.repeat(transformed_codewords.T, int(n/m), axis=0)  # n x d_y
+    transformed_codewords = np.array([trans(x) for x in codebook])
+    dup_trans_codewords = np.repeat(transformed_codewords, int(n/m), axis=0)  # n x d_y
     return dup_trans_codewords + noise_dataset
 
 
-def plot_dataset(dataset, m, snr, codebook, inv_trans):
-    for j in range(1):
-        fig = plt.figure()
-        cm = plt.get_cmap('gist_rainbow')
-        ax = fig.add_subplot(111)
-        ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
-        for i in range(m):
-            ax.scatter(codebook[i][0], codebook[i][1], marker='o', s=50)
-        ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
-        if j == 0:
-            for i in range(m):
-                ax.scatter(dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 0],
-                           dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 1], marker='x', s=10)
-        else:
-            for i in range(m):
-                inv_tans_dataset = np.array(dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)])
-                inv_tans_dataset = inv_trans(inv_tans_dataset.T)
-                inv_tans_dataset = inv_tans_dataset.T
-                ax.scatter(inv_tans_dataset[:, 0], inv_tans_dataset[:, 1], marker='x', s=10)
-        plt.grid()
-        if j == 0:
-            plt.savefig('Codebook_and_samples_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
-        else:
-            plt.savefig('Codebook_and_inv_transformed_samples_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
-        plt.close()
+def plot_dataset(dataset, m, snr, codebook):
+    fig = plt.figure()
+    cm = plt.get_cmap('gist_rainbow')
+    ax = fig.add_subplot(111)
+    ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
+    for i in range(m):
+        ax.scatter(codebook[i][0], codebook[i][1], marker='o', s=50)
+    ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
+    for i in range(m):
+        ax.scatter(dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 0],
+                   dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 1], marker='x', s=10)
+    plt.grid()
+    plt.savefig('Codebook_and_samples_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
+    plt.close()
 
 
 def delta_array(L, d, m, codebook):
@@ -243,26 +219,21 @@ def single_to_double_index(l, m):
     return i, j
 
 
-def decode_sample(a, codebook, S):
-    return np.argmin([distance.mahalanobis(a, c, S) for c in codebook])
-
-
 def decode(codebook, dataset, m, n, d, S):
+    decode_sample = lambda a, cb, S: np.argmin([distance.mahalanobis(a, c, S) for c in cb])
     examples = dataset.reshape(m*n, d)
     classification = np.apply_along_axis(decode_sample, 1, examples, codebook, S)
     return classification
 
 
-def decode_sample_LTNN(a, cb, h):
-    return np.argmin([LA.norm(a - h @ c) for c in cb])
-
-
 def decode_LTNN(codebook, dataset, m, n, d, H):
+    decode_sample_LTNN = lambda a, cb, h: np.argmin([LA.norm(a - h @ c) for c in cb])
     classification = np.apply_along_axis(decode_sample_LTNN, 1, dataset, codebook, H)
     return classification
 
 
-def trans_decode(codebook, dataset, inv_trans):
+def trans_decode(codebook, dataset, trans):
+    inv_trans = lambda y, cb: np.argmin([distance.euclidean(trans(c), y) for c in cb])
     classification = np.apply_along_axis(inv_trans, 1, dataset, codebook)
     return classification
 
@@ -299,10 +270,10 @@ def gen_partition(deltas):
     return P_arr
 
 
-def make_run_dir(load, load_dir):
+def make_run_dir(load, load_dir, model):
     if not os.path.exists("runs"):
         os.mkdir("runs")
-    os.chdir("runs/LTNN")
+    os.chdir("runs/"+model)
     now = datetime.now()
     dt_string = now.strftime("%Y_%m_%d_%H%M%S")
     if load:
@@ -340,10 +311,11 @@ def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr, codebook_energy)
     print(snr_values)
     print(errors)
     print(cov_errors)
-    ax.plot(snr_values, errors, color='blue', marker='s', linewidth=2)
-    ax.plot(snr_values, cov_errors, color='black', linestyle='dashed', marker='s', linewidth=2)
+    ax.plot(snr_values, errors, color='blue', marker='s', linewidth=2, label=r'$H_T$')
+    ax.plot(snr_values, cov_errors, color='black', linestyle='dashed', marker='s', linewidth=2, label=r'$f(\cdot)$')
     ax.tick_params(labelsize='medium', width=3)
     plt.axvline(x=10*np.log10(codebook_energy/org_snr))
+    plt.legend()
     # plt.yscale('symlog', linthresh=10**-7)
     plt.yscale('log')
     # plt.ylim([-10**-7, 1])
