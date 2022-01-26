@@ -76,7 +76,7 @@ def snr_test_plot(h, codebook, m, d, noise_type, noise_cov, mix_dist, snr_range,
     return total_errors, total_trans_errors
 
 
-def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_lambda, partition, batch_size):
+def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_lambda, partition, batch_size, with_s=True):
     s_array = []
     h_array = []
     s = np.zeros((d_x, d_x))
@@ -92,10 +92,16 @@ def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_l
             for x_tag in codebook:
                 x_tag_e = np.expand_dims(x_tag, axis=1)
                 if not np.array_equal(x_tag_e, x_j):
-                    indicate = y_t.T @ h @ (x_j - x_tag_e) - 0.5 * (x_j + x_tag_e).T @ s @ (x_j - x_tag_e)
+                    if with_s:
+                        indicate = y_t.T @ h @ (x_j - x_tag_e) - 0.5 * (x_j + x_tag_e).T @ s @ (x_j - x_tag_e)
+                    else:
+                        indicate = y_t.T @ h @ (x_j - x_tag_e) - 0.5 * (x_j + x_tag_e).T @ h.T @ h @ (x_j - x_tag_e)
                     if indicate < 1:
-                        v_h_t += y_t @ (x_j-x_tag_e).T
-                        v_s_t += (x_j+x_tag_e)@(x_j-x_tag_e).T+(x_j-x_tag_e)@(x_j+x_tag_e).T
+                        if with_s:
+                            v_h_t += y_t @ (x_j-x_tag_e).T
+                            v_s_t += (x_j+x_tag_e)@(x_j-x_tag_e).T+(x_j-x_tag_e)@(x_j+x_tag_e).T
+                        else:
+                            v_h_t += y_t @ (x_j - x_tag_e).T-0.5*h@((x_j+x_tag_e)@(x_j-x_tag_e).T+(x_j-x_tag_e)@(x_j+x_tag_e).T)
         grad_h_t = 0
         grad_s_t = 0
         for i, p_i in enumerate(partition):
@@ -103,8 +109,8 @@ def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_l
             grad_h_t += etas[i] * 2 * (h @ delta_h @ delta_h.T)
             delta_s = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
             grad_s_t += etas[i] * (s @ delta_s @ delta_s.T + delta_s @ delta_s.T @ s)
-        grad_h_t = scale_lambda[0]*grad_h_t - 3*v_h_t/(batch_size*(m-1))
-        grad_s_t = scale_lambda[1]*grad_s_t + 3*0.25*v_s_t/(batch_size*(m-1))
+        grad_h_t = scale_lambda[0]*grad_h_t - v_h_t/(batch_size*(m-1))
+        grad_s_t = scale_lambda[1]*grad_s_t + 0.25*v_s_t/(batch_size*(m-1))
         if scale_lambda[0] == 0 or scale_lambda[1] == 0:
             h -= (1/t)*grad_h_t
             s -= (1/t)*grad_s_t
@@ -112,10 +118,11 @@ def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_l
             h -= (1/(scale_lambda[0]*t))*grad_h_t
             s -= (1/(scale_lambda[1]*t))*grad_s_t
         # s = utils.get_near_psd(s)
-        h, s = utils.projection(h, s)
+        if with_s:
+            h, s = utils.projection(h, s)
         h_array.append(np.copy(h))
         s_array.append(np.copy(s))
-    utils.plot_norms(h_array, s_array, scale_lambda)
+    # utils.plot_norms(h_array, s_array, scale_lambda)
     return h_array, s_array
 
 
@@ -218,10 +225,10 @@ def main():
         d_x = 2
         d_y = 2
         basic_dict = {"d_x": d_x, "d_y": d_y, "m": 16, "n": 160, "test_n_ratio": 4, "iterations": 1600,
-                      "scale_lambda": (0.25, 0.25),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 9, "codebook_type": "Grid",
-                      "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.005, "snr_steps": 10,
-                      "snr_seed": 6, "trans_type": "Quadratic", "max_eigenvalue": 1, "min_eigenvalue": 0.5,
-                      "lambda_range": [-1, -0.5], "batch_size": 1}
+                      "scale_lambda": (0.06, 0.06),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 3, "codebook_type": "Grid",
+                      "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.01, "snr_steps": 10,
+                      "snr_seed": 6, "trans_type": "Quadratic", "max_eigenvalue": 1, "min_eigenvalue": 0.8,
+                      "lambda_range": [-1.4, -1.1], "batch_size": 1, "with_s": False}
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d_x'])
         basic_dict['code_cov'] = code_cov
@@ -255,7 +262,7 @@ def main():
             for lambda_i in log_range:
                 h_array, s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'],
                                                    basic_dict['etas'], basic_dict['d_x'], basic_dict['d_y'], codebook,
-                                                   train_dataset, (lambda_i, lambda_i), partition, basic_dict["batch_size"])
+                                                   train_dataset, (lambda_i, lambda_i), partition, basic_dict["batch_size"], basic_dict["with_s"])
                 print("Finished running alg, now testing")
                 _, _, _, _ = plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, basic_dict['m'],
                                           basic_dict['n'], basic_dict['n'] * basic_dict['test_n_ratio'],
@@ -264,7 +271,7 @@ def main():
             h_array, s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'],
                                                basic_dict['etas'],
                                                basic_dict['d_x'], basic_dict['d_y'], codebook, train_dataset,
-                                               basic_dict['scale_lambda'], partition, basic_dict["batch_size"])
+                                               basic_dict['scale_lambda'], partition, basic_dict["batch_size"], basic_dict["with_s"])
             print("Finished running alg, now testing")
     if load_errors:
         utils.plot_error_rate(basic_dict['train_errors'], basic_dict['iterations']*[basic_dict['cov_train_error']],
