@@ -13,83 +13,83 @@ import math
 import cvxpy as cp
 
 
-def gen_codebook(codebook_type, m, d):
-    if codebook_type == "Gaussian":
-        mu = d*[0]
-        cov = np.random.normal(0, 1, size=(d, d))
+def gen_codebook(basic_dict):
+    if basic_dict['codebook_type'] == "Gaussian":
+        mu = basic_dict['d_x']*[0]
+        cov = np.random.normal(0, 1, size=(basic_dict['d_x'], basic_dict['d_x']))
         cov = np.dot(cov, cov.transpose())
         cov_diag = cov.diagonal()
         cov = cov / np.sum(cov_diag)
         rv = multivariate_normal(mu, cov)
-        return rv.rvs(m), cov  # codebook is m x d
-    if codebook_type == "Grid":
-        codewords_per_axis = int(np.ceil(m**(1/d)))
+        return rv.rvs(basic_dict['m']), cov  # codebook is m x d
+    if basic_dict['codebook_type'] == "Grid":
+        codewords_per_axis = int(np.ceil(basic_dict['m']**(1/basic_dict['d_x'])))
         # grid = list(multiset_permutations(np.linspace(-1, 1, codewords_per_axis), d))
         # repetitions = [d*[e] for e in np.linspace(-1, 1, codewords_per_axis) if e != 0]
         # complete_grid = np.array(grid+repetitions)
-        grid = [list(p) for p in itertools.product(np.linspace(-1, 1, codewords_per_axis), repeat=d)]
+        grid = [list(p) for p in itertools.product(np.linspace(-1, 1, codewords_per_axis), repeat=basic_dict['d_x'])]
         if codewords_per_axis % 2 == 1:
-            grid.remove(d*[0.0])
+            grid.remove(basic_dict['d_x']*[0.0])
         grid = np.array(grid)
         indexlist = np.argsort(np.linalg.norm(grid, axis=1))
-        return grid[indexlist[:m]], None
-    if codebook_type == "Circle":
+        return grid[indexlist[:basic_dict['m']]], None
+    if basic_dict['codebook_type'] == "Circle":
         pi = math.pi
-        return np.array([(math.cos(2*pi/m*x), math.sin(2*pi/m*x)) for x in range(m)]), None
-    if codebook_type == "TwoCircles":
+        return np.array([(math.cos(2*pi/basic_dict['m']*x), math.sin(2*pi/basic_dict['m']*x)) for x in range(basic_dict['m'])]), None
+    if basic_dict['codebook_type'] == "TwoCircles":
         pi = math.pi
-        outer_words = int(2*m/3)
-        inner_words = m - outer_words
+        outer_words = int(2*basic_dict['m']/3)
+        inner_words = basic_dict['m'] - outer_words
         outer_circle = [(math.cos(2*pi/outer_words*x), math.sin(2*pi/outer_words*x)) for x in range(outer_words)]
         inner_circle = [(0.5*math.cos(2*pi/inner_words*x), 0.5*math.sin(2*pi/inner_words*x)) for x in range(inner_words)]
         return np.array(outer_circle+inner_circle), None
-    if codebook_type == "GridInCircle":
+    if basic_dict['codebook_type'] == "GridInCircle":
         pi = math.pi
-        outer_words = int(2*m/3)
-        inner_words = m - outer_words
+        outer_words = int(2*basic_dict['m']/3)
+        inner_words = basic_dict['m'] - outer_words
         outer_circle = [(math.cos(2*pi/outer_words*x), math.sin(2*pi/outer_words*x)) for x in range(outer_words)]
-        codewords_per_axis = int(np.ceil(inner_words**(1/d)))
-        inner = [list(p) for p in itertools.product(np.linspace(-0.3, 0.3, codewords_per_axis), repeat=d)]
+        codewords_per_axis = int(np.ceil(inner_words**(1/basic_dict['d_x'])))
+        inner = [list(p) for p in itertools.product(np.linspace(-0.3, 0.3, codewords_per_axis), repeat=basic_dict['d_x'])]
         if codewords_per_axis % 2 == 1:
-            inner.remove(d*[0.0])
+            inner.remove(basic_dict['d_x']*[0.0])
         return np.array(outer_circle+inner), None
 
 
-def gen_noise_dataset(noise_type, n, d, noise_energy, noise_cov=None, mix_dist=None):
+def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None):
     cov = None
-    if noise_type in ["Gaussian", "WhiteGaussian"]:
-        mu = d*[0]
+    if basic_dict['noise_type'] in ["Gaussian", "WhiteGaussian"]:
+        mu = basic_dict['d_y']*[0]
         if noise_cov is None:
-            if noise_type == "WhiteGaussian":
-                cov = (noise_energy/d)*np.eye(d)
+            if basic_dict['noise_type'] == "WhiteGaussian":
+                cov = (basic_dict['noise_energy']/basic_dict['d_y'])*np.eye(basic_dict['d_y'])
             else:
-                cov = np.random.normal(0, 1, size=(d, d))
+                cov = np.random.normal(0, 1, size=(basic_dict['d_y'], basic_dict['d_y']))
                 cov = np.dot(cov, cov.transpose())
                 cov_diag = cov.diagonal()
-                cov = (noise_energy/np.sum(cov_diag))*cov
+                cov = (basic_dict['noise_energy']/np.sum(cov_diag))*cov
         else:
             cov_diag = noise_cov.diagonal()
-            cov = (noise_energy/np.sum(cov_diag))*noise_cov
+            cov = (basic_dict['noise_energy']/np.sum(cov_diag))*noise_cov
         rv = multivariate_normal(mu, cov)
         return rv.rvs(n), cov, None  # noise samples are n x d
-    if noise_type == "Mixture":
-        mu = d * [0]
+    if basic_dict['noise_type'] == "Mixture":
+        mu = basic_dict['d_y'] * [0]
         if noise_cov is None:
             n_gaussians = np.random.randint(3, 10)
             mixture_dist = np.abs(np.random.normal(0, 1, size=n_gaussians))
             mixture_dist = mixture_dist / np.sum(mixture_dist)
-            covs = np.random.normal(0, 1, size=(n_gaussians, d, d))
+            covs = np.random.normal(0, 1, size=(n_gaussians, basic_dict['d_y'], basic_dict['d_y']))
             for i, cov in enumerate(covs):
                 cov = np.dot(cov, cov.transpose())
                 cov_diag = cov.diagonal()
-                covs[i] = (noise_energy / np.sum(cov_diag)) * cov
+                covs[i] = (basic_dict['noise_energy'] / np.sum(cov_diag)) * cov
         else:
             n_gaussians = len(noise_cov)
             mixture_dist = mix_dist
             covs = noise_cov
             for i, cov in enumerate(covs):
                 cov_diag = cov.diagonal()
-                covs[i] = (noise_energy / np.sum(cov_diag)) * cov
+                covs[i] = (basic_dict['noise_energy'] / np.sum(cov_diag)) * cov
         rvs = [multivariate_normal(mu, covs[i]) for i in range(n_gaussians)]
         mixture_idx = np.random.choice(len(mixture_dist), size=n, replace=True, p=mixture_dist)
         samples = np.array([rvs[idx].rvs(1) for idx in mixture_idx])
@@ -158,43 +158,44 @@ def rebuild_trans_from_kernel(f_kernel, trans_type):
     return f
 
 
-def dataset_transform(codebook, noise_dataset, m, n, d):
-    dataset = np.zeros((m, n, d))  # dataset is m x n x d
+def dataset_transform(codebook, noise_dataset, n, basic_dict):
+    dataset = np.zeros((basic_dict['m'], n, basic_dict['d_x']))  # dataset is m x n x d
     for i in range(len(codebook)):
         dataset[i] = noise_dataset + codebook[i]
     return dataset
 
 
-def dataset_transform_LTNN(codebook, noise_dataset, m, n, trans):
+def dataset_transform_LTNN(codebook, noise_dataset, basic_dict, n, trans):
     transformed_codewords = np.array([trans(x) for x in codebook])
-    dup_trans_codewords = np.repeat(transformed_codewords, int(n/m), axis=0)  # n x d_y
+    dup_trans_codewords = np.repeat(transformed_codewords, int(n/basic_dict['m']), axis=0)  # n x d_y
     return dup_trans_codewords + noise_dataset
 
 
-def plot_dataset(dataset, m, snr, codebook, model):
+def plot_dataset(dataset, snr, codebook, basic_dict):
     fig = plt.figure()
     cm = plt.get_cmap('gist_rainbow')
     ax = fig.add_subplot(111)
-    ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
-    for i in range(m):
+    ax.set_prop_cycle(color=[cm(1. * i / basic_dict['m']) for i in range(basic_dict['m'])])
+    for i in range(basic_dict['m']):
         ax.scatter(codebook[i][0], codebook[i][1], marker='o', s=50)
-    ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
-    for i in range(m):
-        if model == "LTNN":
-            ax.scatter(dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 0],
-                       dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 1], marker='x', s=10)
-        if model == "MNN":
+    ax.set_prop_cycle(color=[cm(1. * i / basic_dict['m']) for i in range(basic_dict['m'])])
+    for i in range(basic_dict['m']):
+        if basic_dict['model'] == "LTNN":
+            ax.scatter(dataset[i*int(len(dataset)/basic_dict['m']):(i+1)*int(len(dataset)/basic_dict['m'])-1, 0],
+                       dataset[i*int(len(dataset)/basic_dict['m']):(i+1)*int(len(dataset)/basic_dict['m'])-1, 1], marker='x', s=10)
+        if basic_dict['model'] == "MNN":
             ax.scatter(dataset[i, :, 0], dataset[i, :, 1], marker='x', s=10)
     plt.grid()
     plt.savefig('Codebook_and_samples_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
     plt.close()
 
 
-def delta_array(L, d, m, codebook):
-    deltas = np.zeros((L, d))
-    for i in range(m):
-        for j in range(i+1, m):
-            deltas[double_to_single_index(i, j, m)] = codebook[i] - codebook[j]
+def delta_array(codebook, basic_dict):
+    L = int(basic_dict['m'] * (basic_dict['m'] - 1) / 2)
+    deltas = np.zeros((L, basic_dict['d_x']))
+    for i in range(basic_dict['m']):
+        for j in range(i+1, basic_dict['m']):
+            deltas[double_to_single_index(i, j, basic_dict['m'])] = codebook[i] - codebook[j]
     return deltas
 
 
@@ -241,16 +242,16 @@ def trans_decode(codebook, dataset, trans):
     return classification
 
 
-def plot_decoding(dataset, classification, m, n, d, t, model):
+def plot_decoding(dataset, classification, basic_dict, t):
     fig = plt.figure()
     cm = plt.get_cmap('gist_rainbow')
     ax = fig.add_subplot(111)
-    ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
-    for i in range(m):
-        if model == "LTNN":
+    ax.set_prop_cycle(color=[cm(1. * i / basic_dict['m']) for i in range(basic_dict['m'])])
+    for i in range(basic_dict['m']):
+        if basic_dict['model'] == "LTNN":
             ax.scatter(dataset[np.where(classification == i), 0], dataset[np.where(classification == i), 1],
                        marker='x', s=10)
-        if model == "MNN":
+        if basic_dict['model'] == "MNN":
             ax.scatter(dataset[i, :, 0], dataset[i, :, 1], marker='x', s=10)
     ax.set_title("Classification")
     plt.grid()
@@ -276,10 +277,10 @@ def gen_partition(deltas):
     return P_arr
 
 
-def make_run_dir(load, load_dir, model):
+def make_run_dir(load, load_dir, basic_dict):
     if not os.path.exists("runs"):
         os.mkdir("runs")
-    os.chdir("runs/"+model)
+    os.chdir("runs/"+basic_dict['model'])
     now = datetime.now()
     dt_string = now.strftime("%Y_%m_%d_%H%M%S")
     if load:
@@ -309,16 +310,16 @@ def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors
         plt.close()
 
 
-def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr, codebook_energy):
+def plot_snr_error_rate(errors, cov_errors, basic_dict):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    print(snr_range)
+    print(basic_dict['snr_range'])
     print(errors)
     print(cov_errors)
-    ax.plot(snr_range, errors, color='blue', marker='s', linewidth=2, label=r'$H_T$')
-    ax.plot(snr_range, cov_errors, color='black', linestyle='dashed', marker='s', linewidth=2, label=r'$f(\cdot)$')
+    ax.plot(basic_dict['snr_range'], errors, color='blue', marker='s', linewidth=2, label=r'$H_T$')
+    ax.plot(basic_dict['snr_range'], cov_errors, color='black', linestyle='dashed', marker='s', linewidth=2, label=r'$f(\cdot)$')
     ax.tick_params(labelsize='medium', width=3)
-    plt.axvline(x=10*np.log10(codebook_energy/org_snr))
+    plt.axvline(x=10*np.log10(basic_dict['code_energy']/basic_dict['noise_energy']))
     plt.legend()
     # plt.yscale('symlog', linthresh=10**-7)
     plt.yscale('log')
@@ -333,7 +334,7 @@ def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr, codebook_energy)
     np.save(f, cov_errors)
     f.close()
     f = open('SNR_range.npy', 'wb')
-    np.save(f, snr_range)
+    np.save(f, basic_dict['snr_range'])
     f.close()
 
 

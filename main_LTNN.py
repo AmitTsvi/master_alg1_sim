@@ -11,55 +11,51 @@ import os
 from operator import add
 
 
-def init_precision_matrix(d):
-    a = np.random.rand(d, d)
-    return np.dot(a, a.T)
-
-
-def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, m, n, test_n, d, trans, trans_type, lambda_scale=None):
+def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, basic_dict, trans, lambda_scale=None):
     train_errors = []
     test_errors = []
     iteration_gap = 1
-    train_true_classification = np.repeat(np.array([i for i in range(m)]), int(n/m), axis=0)
-    test_true_classification = np.repeat(np.array([i for i in range(m)]), int(test_n/m), axis=0)
+    test_n = basic_dict['n'] * basic_dict['test_n_ratio']
+    train_true_classification = np.repeat(np.array([i for i in range(basic_dict['m'])]), int(basic_dict['n']/basic_dict['m']), axis=0)
+    test_true_classification = np.repeat(np.array([i for i in range(basic_dict['m'])]), int(test_n/basic_dict['m']), axis=0)
     for t in range(0, len(s_array), iteration_gap):
-        train_classification = utils.decode_LTNN(codebook, train_dataset, m, n, d, h_array[t])
-        test_classification = utils.decode_LTNN(codebook, test_dataset, m, test_n, d, h_array[t])
-        train_errors.append(np.sum(train_classification != train_true_classification)/n)
+        train_classification = utils.decode_LTNN(codebook, train_dataset, basic_dict['m'], basic_dict['n'], basic_dict['d_y'], h_array[t])
+        test_classification = utils.decode_LTNN(codebook, test_dataset, basic_dict['m'], test_n, basic_dict['d_y'], h_array[t])
+        train_errors.append(np.sum(train_classification != train_true_classification)/basic_dict['n'])
         test_errors.append(np.sum(test_classification != test_true_classification)/test_n)
-        if t % 40 == 0 and d == 2 and not lambda_sweep:
-            utils.plot_decoding(train_dataset, train_classification, m, n, d, t, "LTNN")
+        if t % 40 == 0 and basic_dict['d_y'] == 2 and not lambda_sweep:
+            utils.plot_decoding(train_dataset, train_classification, basic_dict, t)
     train_classification = utils.trans_decode(codebook, train_dataset, trans)
     test_classification = utils.trans_decode(codebook, test_dataset, trans)
-    trans_train_error = np.sum(train_classification != train_true_classification)/n
+    trans_train_error = np.sum(train_classification != train_true_classification)/basic_dict['n']
     trans_test_error = np.sum(test_classification != test_true_classification)/test_n
     utils.plot_error_rate(train_errors, int(len(s_array)/iteration_gap)*[trans_train_error], test_errors,
                           int(len(s_array)/iteration_gap)*[trans_test_error], lambda_scale, iteration_gap)
     return train_errors, test_errors, trans_train_error, trans_test_error
 
 
-def snr_test_plot(h, codebook, m, d, noise_type, noise_cov, mix_dist, snr_range, org_energy, snr_seed, trans, codebook_energy, trans_type):
-    np.random.seed(snr_seed)
+def snr_test_plot(h, codebook, basic_dict, trans):
+    np.random.seed(basic_dict["snr_seed"])
     val_size = 4000
     n_cycles = 20
-    total_errors = np.zeros(len(snr_range))
-    total_trans_errors = np.zeros(len(snr_range))
-    noise_energy_range = [codebook_energy*10**(-s/10) for s in snr_range]
+    total_errors = np.zeros(len(basic_dict['snr_range']))
+    total_trans_errors = np.zeros(len(basic_dict['snr_range']))
+    noise_energy_range = [basic_dict['code_energy']*10**(-s/10) for s in basic_dict['snr_range']]
     for i in range(n_cycles):
         print("SNR Test Number "+str(i))
         datasets = []
         for n_energy in noise_energy_range:
-            new_snr_dataset, _, _ = utils.gen_noise_dataset(noise_type, val_size, d, n_energy, noise_cov, mix_dist)
-            new_snr_trans = utils.dataset_transform_LTNN(codebook, new_snr_dataset, m, val_size, trans)
+            new_snr_dataset, _, _ = utils.gen_noise_dataset(basic_dict, val_size, basic_dict['noise_cov'], basic_dict['mix_dist'])
+            new_snr_trans = utils.dataset_transform_LTNN(codebook, new_snr_dataset, basic_dict, val_size, trans)
             datasets.append(new_snr_trans)
-        errors = np.zeros(len(snr_range))
-        trans_errors = np.zeros(len(snr_range))
-        true_classification = np.repeat(np.array([i for i in range(m)]), int(val_size/m), axis=0)
+        errors = np.zeros(len(basic_dict['snr_range']))
+        trans_errors = np.zeros(len(basic_dict['snr_range']))
+        true_classification = np.repeat(np.array([i for i in range(basic_dict['m'])]), int(val_size/basic_dict['m']), axis=0)
         # print(snr_range)
         # print(org_energy)
-        for index in range(len(snr_range)):
+        for index in range(len(basic_dict['snr_range'])):
             print("SNR index " + str(index) + "\n")
-            classification = utils.decode_LTNN(codebook, datasets[index], m, val_size, d, h)
+            classification = utils.decode_LTNN(codebook, datasets[index], basic_dict['m'], val_size, basic_dict['d_y'], h)
             error = np.sum(classification != true_classification) / val_size
             errors[index] = error
             # print(error)
@@ -67,37 +63,37 @@ def snr_test_plot(h, codebook, m, d, noise_type, noise_cov, mix_dist, snr_range,
             trans_error = np.sum(classification != true_classification) / val_size
             trans_errors[index] = trans_error
             if i == 0:
-                utils.plot_dataset(datasets[index], m, snr_range[index], codebook, "LTNN")
+                utils.plot_dataset(datasets[index], basic_dict['snr_range'][index], codebook, basic_dict)
         total_errors += errors
         total_trans_errors += trans_errors
     total_errors = total_errors/n_cycles
     total_trans_errors = total_trans_errors/n_cycles
-    utils.plot_snr_error_rate(total_errors, total_trans_errors, snr_range, org_energy, codebook_energy)
+    utils.plot_snr_error_rate(total_errors, total_trans_errors, basic_dict)
     return total_errors, total_trans_errors
 
 
-def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_lambda, partition, batch_size, with_s=True):
+def subgradient_alg(basic_dict, codebook, dataset, scale_lambda, partition):
     s_array = []
     h_array = []
-    s = np.zeros((d_x, d_x))
-    h = np.zeros((d_y, d_x))
+    s = np.zeros((basic_dict['d_x'], basic_dict['d_x']))
+    h = np.zeros((basic_dict['d_y'], basic_dict['d_x']))
     print("Starting algorithm run with "+str(scale_lambda))
-    for t in range(1, iterations+1):
+    for t in range(1, basic_dict['iterations']+1):
         v_h_t = 0
         v_s_t = 0
-        for k in range(batch_size):
-            z_t = np.random.randint(n)
+        for k in range(basic_dict["batch_size"]):
+            z_t = np.random.randint(basic_dict['n'])
             y_t = np.expand_dims(dataset[z_t], axis=1)
-            x_j = np.expand_dims(codebook[int(np.floor(z_t/(n/m)))], axis=1)
+            x_j = np.expand_dims(codebook[int(np.floor(z_t/(basic_dict['n']/basic_dict['m'])))], axis=1)
             for x_tag in codebook:
                 x_tag_e = np.expand_dims(x_tag, axis=1)
                 if not np.array_equal(x_tag_e, x_j):
-                    if with_s:
+                    if basic_dict["with_s"]:
                         indicate = y_t.T @ h @ (x_j - x_tag_e) - 0.5 * (x_j + x_tag_e).T @ s @ (x_j - x_tag_e)
                     else:
                         indicate = y_t.T @ h @ (x_j - x_tag_e) - 0.5 * (x_j + x_tag_e).T @ h.T @ h @ (x_j - x_tag_e)
                     if indicate < 1:
-                        if with_s:
+                        if basic_dict["with_s"]:
                             v_h_t += y_t @ (x_j-x_tag_e).T
                             v_s_t += (x_j+x_tag_e)@(x_j-x_tag_e).T+(x_j-x_tag_e)@(x_j+x_tag_e).T
                         else:
@@ -106,18 +102,18 @@ def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_l
         grad_s_t = 0
         for i, p_i in enumerate(partition):
             delta_h = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(h, p_i.T), axis=0) ** 2)], axis=1)
-            grad_h_t += etas[i] * 2 * (h @ delta_h @ delta_h.T)
+            grad_h_t += basic_dict['etas'][i] * 2 * (h @ delta_h @ delta_h.T)
             delta_s = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
-            grad_s_t += etas[i] * (s @ delta_s @ delta_s.T + delta_s @ delta_s.T @ s)
-        grad_h_t = scale_lambda[0]*grad_h_t - v_h_t/(batch_size*(m-1))
-        grad_s_t = scale_lambda[1]*grad_s_t + 0.25*v_s_t/(batch_size*(m-1))
+            grad_s_t += basic_dict['etas'][i] * (s @ delta_s @ delta_s.T + delta_s @ delta_s.T @ s)
+        grad_h_t = scale_lambda[0]*grad_h_t - v_h_t/(basic_dict["batch_size"]*(basic_dict['m']-1))
+        grad_s_t = scale_lambda[1]*grad_s_t + 0.25*v_s_t/(basic_dict["batch_size"]*(basic_dict['m']-1))
         if scale_lambda[0] == 0 or scale_lambda[1] == 0:
             h -= (1/t)*grad_h_t
             s -= (1/t)*grad_s_t
         else:
             h -= (1/(scale_lambda[0]*t))*grad_h_t
             s -= (1/(scale_lambda[1]*t))*grad_s_t
-        if with_s:
+        if basic_dict["with_s"]:
             h, s = utils.projection(h, s)
         h_array.append(np.copy(h))
         s_array.append(np.copy(s))
@@ -216,10 +212,9 @@ def main():
             snr_range = np.load(f)
             f.close()
         os.chdir(owd)
-        utils.make_run_dir(load, workdir, "LTNN")
+        utils.make_run_dir(load, workdir, basic_dict)
         channel_trans = utils.rebuild_trans_from_kernel(basic_dict['trans_kernel'], basic_dict['trans_type'])
     else:
-        utils.make_run_dir(load, None, "LTNN")
         d_x = 2
         d_y = 2
         basic_dict = {"d_x": d_x, "d_y": d_y, "m": 16, "n": 160, "test_n_ratio": 4, "iterations": 1600,
@@ -227,8 +222,9 @@ def main():
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.01, "snr_steps": 10,
                       "snr_seed": 6, "trans_type": "Quadratic", "max_eigenvalue": 1, "min_eigenvalue": 0.8,
                       "lambda_range": [-1.4, -1.1], "batch_size": 1, "with_s": False}
+        utils.make_run_dir(load, None, basic_dict)
         np.random.seed(basic_dict['seed'])
-        codebook, code_cov = utils.gen_codebook(basic_dict['codebook_type'], basic_dict['m'], basic_dict['d_x'])
+        codebook, code_cov = utils.gen_codebook(basic_dict)
         basic_dict['code_cov'] = code_cov
         basic_dict['code_energy'] = np.mean(np.sum(np.power(codebook, 2), axis=1))
         basic_dict['train_snr'] = 10*np.log10(basic_dict['code_energy']/basic_dict['noise_energy'])
@@ -237,39 +233,29 @@ def main():
                                                                basic_dict['max_eigenvalue'],
                                                                basic_dict['min_eigenvalue'])
         basic_dict['trans_kernel'] = trans_kernel
-        noise_dataset, noise_cov, mix_dist = utils.gen_noise_dataset(basic_dict['noise_type'], basic_dict['n'],
-                                                                     basic_dict['d_y'], basic_dict['noise_energy'])
+        noise_dataset, noise_cov, mix_dist = utils.gen_noise_dataset(basic_dict, basic_dict['n'])
         basic_dict['noise_cov'] = noise_cov
         basic_dict['mix_dist'] = mix_dist
-        test_noise_dataset, _, _ = utils.gen_noise_dataset(basic_dict['noise_type'],
-                                                           basic_dict["test_n_ratio"]*basic_dict['n'],
-                                                           basic_dict['d_y'], basic_dict['noise_energy'],
+        test_noise_dataset, _, _ = utils.gen_noise_dataset(basic_dict, basic_dict["test_n_ratio"]*basic_dict['n'],
                                                            noise_cov, mix_dist)
-    train_dataset = utils.dataset_transform_LTNN(codebook, noise_dataset, basic_dict['m'], basic_dict['n'],
+    train_dataset = utils.dataset_transform_LTNN(codebook, noise_dataset, basic_dict, basic_dict['n'],
                                                  channel_trans)
-    test_dataset = utils.dataset_transform_LTNN(codebook, test_noise_dataset, basic_dict['m'],
+    test_dataset = utils.dataset_transform_LTNN(codebook, test_noise_dataset, basic_dict,
                                                 basic_dict["test_n_ratio"]*basic_dict['n'], channel_trans)
-    utils.plot_dataset(train_dataset, basic_dict['m'], basic_dict['train_snr'], codebook, "LTNN")
+    utils.plot_dataset(train_dataset, basic_dict['train_snr'], codebook, basic_dict)
     if not load_s_array:
-        L = int(basic_dict['m'] * (basic_dict['m'] - 1) / 2)  # number of codewords pairs with i<j
-        deltas = utils.delta_array(L, basic_dict['d_x'], basic_dict['m'], codebook)
+        deltas = utils.delta_array(codebook, basic_dict)
         partition = utils.gen_partition(deltas)
         if lambda_sweep:
             log_range = np.logspace(basic_dict["lambda_range"][0], basic_dict["lambda_range"][1], 6)
             # for lambda_i in itertools.product(log_range, log_range):
             for lambda_i in log_range:
-                h_array, s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'],
-                                                   basic_dict['etas'], basic_dict['d_x'], basic_dict['d_y'], codebook,
-                                                   train_dataset, (lambda_i, lambda_i), partition, basic_dict["batch_size"], basic_dict["with_s"])
+                h_array, s_array = subgradient_alg(basic_dict, codebook, train_dataset, (lambda_i, lambda_i), partition)
                 print("Finished running alg, now testing")
-                _, _, _, _ = plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, basic_dict['m'],
-                                          basic_dict['n'], basic_dict['n'] * basic_dict['test_n_ratio'],
-                                          basic_dict['d_y'], channel_trans, basic_dict['trans_type'], lambda_i)
+                _, _, _, _ = plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, basic_dict,
+                                          channel_trans, lambda_i)
         else:
-            h_array, s_array = subgradient_alg(basic_dict['iterations'], basic_dict['m'], basic_dict['n'],
-                                               basic_dict['etas'],
-                                               basic_dict['d_x'], basic_dict['d_y'], codebook, train_dataset,
-                                               basic_dict['scale_lambda'], partition, basic_dict["batch_size"], basic_dict["with_s"])
+            h_array, s_array = subgradient_alg(basic_dict, codebook, train_dataset, basic_dict['scale_lambda'], partition)
             print("Finished running alg, now testing")
     if load_errors:
         utils.plot_error_rate(basic_dict['train_errors'], basic_dict['iterations']*[basic_dict['cov_train_error']],
@@ -277,28 +263,21 @@ def main():
     else:
         train_errors, test_errors, cov_train_error, cov_test_error = plot_pegasos(h_array, s_array, codebook,
                                                                                   train_dataset, test_dataset,
-                                                                                  basic_dict['m'], basic_dict['n'],
-                                                                                  basic_dict['n']*basic_dict['test_n_ratio'],
-                                                                                  basic_dict['d_y'], channel_trans,
-                                                                                  basic_dict['trans_type'])
+                                                                                  basic_dict, channel_trans)
         basic_dict['train_errors'] = train_errors
         basic_dict['test_errors'] = test_errors
         basic_dict['cov_train_error'] = cov_train_error
         basic_dict['cov_test_error'] = cov_test_error
     snr_range = list(np.linspace(basic_dict['train_snr']-10, basic_dict['train_snr']+10, 2*basic_dict['snr_steps']))
     snr_range.append(basic_dict['train_snr'])
-    snr_range = list(np.sort(snr_range))
+    basic_dict['snr_range'] = list(np.sort(snr_range))
     if snr_test:
-        errors, trans_errors = snr_test_plot(h_array[-1], codebook, basic_dict['m'], basic_dict['d_y'],
-                                             basic_dict['noise_type'], basic_dict['noise_cov'], basic_dict['mix_dist'],
-                                             snr_range, basic_dict['noise_energy'], basic_dict["snr_seed"],
-                                             channel_trans, basic_dict['code_energy'], basic_dict['trans_type'])
+        errors, trans_errors = snr_test_plot(h_array[-1], codebook, basic_dict, channel_trans)
         basic_dict['snr_errors'] = errors
         basic_dict['snr_trans_errors'] = trans_errors
     log_run_info(basic_dict)
     if just_replot_SNR:
-
-        utils.plot_snr_error_rate(errors, cov_errors, snr_range, basic_dict['noise_energy'], basic_dict['code_energy'])
+        utils.plot_snr_error_rate(errors, cov_errors, basic_dict)
     if save:
         save_data(codebook, noise_dataset, s_array, basic_dict, test_noise_dataset, h_array)
 
