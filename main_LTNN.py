@@ -28,7 +28,7 @@ def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, m, n, 
         train_errors.append(np.sum(train_classification != train_true_classification)/n)
         test_errors.append(np.sum(test_classification != test_true_classification)/test_n)
         if t % 40 == 0 and d == 2 and not lambda_sweep:
-            utils.plot_decoding(train_dataset, train_classification, m, n, d, t)
+            utils.plot_decoding(train_dataset, train_classification, m, n, d, t, "LTNN")
     train_classification = utils.trans_decode(codebook, train_dataset, trans)
     test_classification = utils.trans_decode(codebook, test_dataset, trans)
     trans_train_error = np.sum(train_classification != train_true_classification)/n
@@ -67,7 +67,7 @@ def snr_test_plot(h, codebook, m, d, noise_type, noise_cov, mix_dist, snr_range,
             trans_error = np.sum(classification != true_classification) / val_size
             trans_errors[index] = trans_error
             if i == 0:
-                utils.plot_dataset(datasets[index], m, snr_range[index], codebook)
+                utils.plot_dataset(datasets[index], m, snr_range[index], codebook, "LTNN")
         total_errors += errors
         total_trans_errors += trans_errors
     total_errors = total_errors/n_cycles
@@ -117,12 +117,10 @@ def subgradient_alg(iterations, m, n, etas, d_x, d_y, codebook, dataset, scale_l
         else:
             h -= (1/(scale_lambda[0]*t))*grad_h_t
             s -= (1/(scale_lambda[1]*t))*grad_s_t
-        # s = utils.get_near_psd(s)
         if with_s:
             h, s = utils.projection(h, s)
         h_array.append(np.copy(h))
         s_array.append(np.copy(s))
-    # utils.plot_norms(h_array, s_array, scale_lambda)
     return h_array, s_array
 
 
@@ -251,7 +249,7 @@ def main():
                                                  channel_trans)
     test_dataset = utils.dataset_transform_LTNN(codebook, test_noise_dataset, basic_dict['m'],
                                                 basic_dict["test_n_ratio"]*basic_dict['n'], channel_trans)
-    utils.plot_dataset(train_dataset, basic_dict['m'], basic_dict['train_snr'], codebook)
+    utils.plot_dataset(train_dataset, basic_dict['m'], basic_dict['train_snr'], codebook, "LTNN")
     if not load_s_array:
         L = int(basic_dict['m'] * (basic_dict['m'] - 1) / 2)  # number of codewords pairs with i<j
         deltas = utils.delta_array(L, basic_dict['d_x'], basic_dict['m'], codebook)

@@ -171,7 +171,7 @@ def dataset_transform_LTNN(codebook, noise_dataset, m, n, trans):
     return dup_trans_codewords + noise_dataset
 
 
-def plot_dataset(dataset, m, snr, codebook):
+def plot_dataset(dataset, m, snr, codebook, model):
     fig = plt.figure()
     cm = plt.get_cmap('gist_rainbow')
     ax = fig.add_subplot(111)
@@ -180,8 +180,11 @@ def plot_dataset(dataset, m, snr, codebook):
         ax.scatter(codebook[i][0], codebook[i][1], marker='o', s=50)
     ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
     for i in range(m):
-        ax.scatter(dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 0],
-                   dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 1], marker='x', s=10)
+        if model == "LTNN":
+            ax.scatter(dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 0],
+                       dataset[i*int(len(dataset)/m):(i+1)*int(len(dataset)/m)-1, 1], marker='x', s=10)
+        if model == "MNN":
+            ax.scatter(dataset[i, :, 0], dataset[i, :, 1], marker='x', s=10)
     plt.grid()
     plt.savefig('Codebook_and_samples_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
     plt.close()
@@ -238,14 +241,17 @@ def trans_decode(codebook, dataset, trans):
     return classification
 
 
-def plot_decoding(dataset, classification, m, n, d, t):
+def plot_decoding(dataset, classification, m, n, d, t, model):
     fig = plt.figure()
     cm = plt.get_cmap('gist_rainbow')
     ax = fig.add_subplot(111)
     ax.set_prop_cycle(color=[cm(1. * i / m) for i in range(m)])
     for i in range(m):
-        ax.scatter(dataset[np.where(classification == i), 0], dataset[np.where(classification == i), 1],
-                   marker='x', s=10)
+        if model == "LTNN":
+            ax.scatter(dataset[np.where(classification == i), 0], dataset[np.where(classification == i), 1],
+                       marker='x', s=10)
+        if model == "MNN":
+            ax.scatter(dataset[i, :, 0], dataset[i, :, 1], marker='x', s=10)
     ax.set_title("Classification")
     plt.grid()
     plt.savefig('Iteration_'+str(t).zfill(6))
@@ -329,25 +335,6 @@ def plot_snr_error_rate(errors, cov_errors, snr_range, org_snr, codebook_energy)
     f = open('SNR_range.npy', 'wb')
     np.save(f, snr_range)
     f.close()
-
-
-def plot_indicator(lto, lambda_range):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(np.logspace(lambda_range[0], lambda_range[1], 50), lto, color='blue', marker='s', linewidth=2)
-    plt.grid()
-    plt.savefig('plot_indicator')
-    plt.close()
-
-
-def plot_norms(h_array, s_array, scale_lambda):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot([LA.norm(h) for h in h_array], color='blue', marker='s', linewidth=2)
-    ax.plot([LA.norm(s) for s in s_array], color='red', marker='s', linewidth=2)
-    plt.grid()
-    plt.savefig('h_norm_blue_s_norm_red_'+str(scale_lambda).replace(".", "_"))
-    plt.close()
 
 
 def projection(h1, s1):
