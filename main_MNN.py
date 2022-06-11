@@ -53,7 +53,7 @@ def snr_test_plot(s, codebook, basic_dict):
         print("SNR Test Number "+str(i))
         datasets = []
         for n_energy in noise_energy_range:
-            new_snr_dataset, _, _ = utils.gen_noise_dataset(basic_dict, val_size, basic_dict['noise_cov'], basic_dict['mix_dist'])
+            new_snr_dataset, _, _ = utils.gen_noise_dataset(basic_dict, val_size, basic_dict['noise_cov'], basic_dict['mix_dist'], n_energy)
             new_snr_trans = utils.dataset_transform(codebook, new_snr_dataset, val_size, basic_dict)
             datasets.append(new_snr_trans)
         errors = np.zeros(len(basic_dict['snr_range']))

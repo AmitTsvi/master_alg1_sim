@@ -41,7 +41,7 @@ def snr_test_plot(h, codebook, basic_dict, trans):
         print("SNR Test Number "+str(i))
         datasets = []
         for n_energy in noise_energy_range:
-            new_snr_dataset, _, _ = utils.gen_noise_dataset(basic_dict, val_size, basic_dict['noise_cov'], basic_dict['mix_dist'])
+            new_snr_dataset, _, _ = utils.gen_noise_dataset(basic_dict, val_size, basic_dict['noise_cov'], basic_dict['mix_dist'], n_energy)
             new_snr_trans = utils.dataset_transform_LTNN(codebook, new_snr_dataset, basic_dict, val_size, trans)
             datasets.append(new_snr_trans)
         errors = np.zeros(len(basic_dict['snr_range']))
@@ -214,7 +214,7 @@ def main():
         d_x = 2
         d_y = 2
         basic_dict = {"d_x": d_x, "d_y": d_y, "m": 16, "n": 160, "test_n_ratio": 4, "iterations": 1600,
-                      "scale_lambda": (0.06, 0.06),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 3, "codebook_type": "Grid",
+                      "scale_lambda": (0.079, 0.079),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 3, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.01, "snr_steps": 10,
                       "snr_seed": 6, "trans_type": "Quadratic", "max_eigenvalue": 1, "min_eigenvalue": 0.8,
                       "lambda_range": [-1.4, -1.1], "batch_size": 1, "with_s": True, "model": "LTNN"}
