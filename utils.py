@@ -55,21 +55,22 @@ def gen_codebook(basic_dict):
         return np.array(outer_circle+inner), None
 
 
-def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None):
-    cov = None
+def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None, noise_energy=None):
+    if noise_energy is None:
+        noise_energy = basic_dict['noise_energy']
     if basic_dict['noise_type'] in ["Gaussian", "WhiteGaussian"]:
         mu = basic_dict['d_y']*[0]
         if noise_cov is None:
             if basic_dict['noise_type'] == "WhiteGaussian":
-                cov = (basic_dict['noise_energy']/basic_dict['d_y'])*np.eye(basic_dict['d_y'])
+                cov = (noise_energy/basic_dict['d_y'])*np.eye(basic_dict['d_y'])
             else:
                 cov = np.random.normal(0, 1, size=(basic_dict['d_y'], basic_dict['d_y']))
                 cov = np.dot(cov, cov.transpose())
                 cov_diag = cov.diagonal()
-                cov = (basic_dict['noise_energy']/np.sum(cov_diag))*cov
+                cov = (noise_energy/np.sum(cov_diag))*cov
         else:
             cov_diag = noise_cov.diagonal()
-            cov = (basic_dict['noise_energy']/np.sum(cov_diag))*noise_cov
+            cov = (noise_energy/np.sum(cov_diag))*noise_cov
         rv = multivariate_normal(mu, cov)
         return rv.rvs(n), cov, None  # noise samples are n x d
     if basic_dict['noise_type'] == "Mixture":
@@ -82,14 +83,14 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None):
             for i, cov in enumerate(covs):
                 cov = np.dot(cov, cov.transpose())
                 cov_diag = cov.diagonal()
-                covs[i] = (basic_dict['noise_energy'] / np.sum(cov_diag)) * cov
+                covs[i] = (noise_energy / np.sum(cov_diag)) * cov
         else:
             n_gaussians = len(noise_cov)
             mixture_dist = mix_dist
             covs = noise_cov
             for i, cov in enumerate(covs):
                 cov_diag = cov.diagonal()
-                covs[i] = (basic_dict['noise_energy'] / np.sum(cov_diag)) * cov
+                covs[i] = (noise_energy / np.sum(cov_diag)) * cov
         rvs = [multivariate_normal(mu, covs[i]) for i in range(n_gaussians)]
         mixture_idx = np.random.choice(len(mixture_dist), size=n, replace=True, p=mixture_dist)
         samples = np.array([rvs[idx].rvs(1) for idx in mixture_idx])

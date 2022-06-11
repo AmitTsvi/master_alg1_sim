@@ -217,7 +217,7 @@ def main():
                       "scale_lambda": (0.06, 0.06),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 3, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.01, "snr_steps": 10,
                       "snr_seed": 6, "trans_type": "Quadratic", "max_eigenvalue": 1, "min_eigenvalue": 0.8,
-                      "lambda_range": [-1.4, -1.1], "batch_size": 1, "with_s": False, "model": "LTNN"}
+                      "lambda_range": [-1.4, -1.1], "batch_size": 1, "with_s": True, "model": "LTNN"}
         utils.make_run_dir(load, None, basic_dict)
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict)
