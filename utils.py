@@ -316,7 +316,7 @@ def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors
         plt.close()
 
 
-def plot_snr_error_rate(errors, cov_errors, basic_dict):
+def plot_snr_error_rate(errors, cov_errors, basic_dict, mean_sol_errors=None):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     print(basic_dict['snr_range'])
@@ -324,6 +324,8 @@ def plot_snr_error_rate(errors, cov_errors, basic_dict):
     print(cov_errors)
     ax.plot(basic_dict['snr_range'], errors, color='blue', marker='s', linewidth=2, label=r'$H_T$')
     ax.plot(basic_dict['snr_range'], cov_errors, color='black', linestyle='dashed', marker='s', linewidth=2, label=r'$f(\cdot)$')
+    if mean_sol_errors is not None:
+        ax.plot(basic_dict['snr_range'], mean_sol_errors, color='red', linestyle='dashed', marker='s', linewidth=2, label=r'$\mu_x$')
     ax.tick_params(labelsize='medium', width=3)
     plt.axvline(x=10*np.log10(basic_dict['code_energy']/basic_dict['noise_energy']))
     plt.legend()
@@ -344,6 +346,10 @@ def plot_snr_error_rate(errors, cov_errors, basic_dict):
     f = open('SNR_range.npy', 'wb')
     np.save(f, basic_dict['snr_range'])
     f.close()
+    if mean_sol_errors is not None:
+        f = open('SNR_mean_sol_errors.npy', 'wb')
+        np.save(f, mean_sol_errors)
+        f.close()
 
 
 def projection(h1, s1):
