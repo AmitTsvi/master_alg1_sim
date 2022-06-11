@@ -186,6 +186,7 @@ def plot_dataset(dataset, snr, codebook, basic_dict):
         if basic_dict['model'] == "MNN":
             ax.scatter(dataset[i, :, 0], dataset[i, :, 1], marker='x', s=10)
     plt.grid()
+    plt.title('Codebook and Output Samples')
     plt.savefig('Codebook_and_samples_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
     plt.close()
 
@@ -298,14 +299,18 @@ def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors
         ax.tick_params(labelsize='medium', width=3)
         plt.yscale('log')
         plt.grid()
+        plt.xlabel('Iteration')
+        plt.ylabel('Error Probability')
         iter_axis = [iter_gap*j for j in range(len(train_errors))]
         if i == 0:
             ax.plot(iter_axis, train_errors, linewidth=2, color='blue')
             ax.plot(iter_axis, cov_train_errors, color='black', linestyle='dashed', linewidth=2)
+            plt.title('Test Error')
             plt.savefig('Train_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         else:
             ax.plot(iter_axis, test_errors, linewidth=2, color='blue')
             ax.plot(iter_axis, cov_test_errors, color='black', linestyle='dashed', linewidth=2)
+            plt.title('Test Error')
             plt.savefig('Test_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         plt.close()
 
@@ -324,6 +329,8 @@ def plot_snr_error_rate(errors, cov_errors, basic_dict):
     # plt.yscale('symlog', linthresh=10**-7)
     plt.yscale('log')
     # plt.ylim([-10**-7, 1])
+    plt.xlabel('SNR [dB]')
+    plt.ylabel('Error Probability')
     plt.grid()
     plt.savefig('Error_Probability_SNR')
     plt.close()

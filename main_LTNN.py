@@ -1,14 +1,10 @@
-import itertools
-
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import RandomState
-from numpy.linalg import inv
 from numpy import linalg as LA
 import utils
 import pickle
 import os
-from operator import add
 
 
 def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, basic_dict, trans, lambda_scale=None):
@@ -221,7 +217,7 @@ def main():
                       "scale_lambda": (0.06, 0.06),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 3, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.01, "snr_steps": 10,
                       "snr_seed": 6, "trans_type": "Quadratic", "max_eigenvalue": 1, "min_eigenvalue": 0.8,
-                      "lambda_range": [-1.4, -1.1], "batch_size": 1, "with_s": False}
+                      "lambda_range": [-1.4, -1.1], "batch_size": 1, "with_s": False, "model": "LTNN"}
         utils.make_run_dir(load, None, basic_dict)
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict)
@@ -248,7 +244,6 @@ def main():
         partition = utils.gen_partition(deltas)
         if lambda_sweep:
             log_range = np.logspace(basic_dict["lambda_range"][0], basic_dict["lambda_range"][1], 6)
-            # for lambda_i in itertools.product(log_range, log_range):
             for lambda_i in log_range:
                 h_array, s_array = subgradient_alg(basic_dict, codebook, train_dataset, (lambda_i, lambda_i), partition)
                 print("Finished running alg, now testing")

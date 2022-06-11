@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import RandomState
-from numpy.linalg import inv
 from numpy import linalg as LA
 import utils
 import pickle
@@ -20,7 +19,6 @@ def plot_pegasos(s_array, codebook, train_dataset, test_dataset, basic_dict):
         train_errors.append(np.sum(train_classification != train_true_classification)/(basic_dict['m']*basic_dict['n']))
         test_errors.append(np.sum(test_classification != test_true_classification) / (test_n*basic_dict['m']))
         if t % 10 == 0 and basic_dict['d_x'] == 2:
-            #(dataset, classification, basic_dict, t)
             utils.plot_decoding(train_dataset, train_classification, basic_dict, t)
     if len(basic_dict['noise_cov'].shape) == 2:
         precision = LA.inv(basic_dict['noise_cov'])
@@ -193,9 +191,10 @@ def main():
         utils.make_run_dir(load, workdir, basic_dict)
     else:
         d = 2
-        basic_dict = {"d_x": d, "d_y": d, "m": 16, "n": 160, "iterations": 100, "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 61,
-                      "codebook_type": "Grid", "codeword_energy": 1, "noise_type": "Mixture",
-                      "noise_energy": 0.05, "snr_steps": 10, "model": "MNN", "test_n_ratio": 4}
+        basic_dict = {"d_x": d, "d_y": d, "m": 16, "n": 160, "test_n_ratio": 4, "iterations": 100,
+                      "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 61, "codebook_type": "Grid",
+                      "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.05, "snr_steps": 10,
+                      "snr_seed": 6, "batch_size": 1, "model": "MNN"}
         utils.make_run_dir(load, None, basic_dict)
         np.random.seed(basic_dict['seed'])
         codebook, code_cov = utils.gen_codebook(basic_dict)
@@ -212,8 +211,15 @@ def main():
     if not load_s_array:
         deltas = utils.delta_array(codebook, basic_dict)
         partition = utils.gen_partition(codebook)
-        s_array = subgradient_alg(basic_dict, deltas, codebook, dataset, basic_dict['scale_lambda'], partition)
-        print("Finished running alg, now testing")
+        if lambda_sweep:
+            log_range = np.logspace(basic_dict["lambda_range"][0], basic_dict["lambda_range"][1], 6)
+            for lambda_i in log_range:
+                s_array = subgradient_alg(basic_dict, deltas, codebook, dataset, lambda_i, partition)
+                print("Finished running alg, now testing")
+                _, _, _, _ = plot_pegasos(s_array, codebook, dataset, test_dataset, basic_dict)
+        else:
+            s_array = subgradient_alg(basic_dict, deltas, codebook, dataset, basic_dict['scale_lambda'], partition)
+            print("Finished running alg, now testing")
     if load_errors:
         utils.plot_error_rate(basic_dict['train_errors'], basic_dict['iterations']*[basic_dict['cov_train_error']],
                               basic_dict['test_errors'], basic_dict['iterations']*[basic_dict['cov_test_error']])
@@ -245,6 +251,7 @@ if __name__ == '__main__':
     save = False
     snr_test = False
     just_replot_SNR = False
+    lambda_sweep = False
 
     if snr_test:
         load = True
