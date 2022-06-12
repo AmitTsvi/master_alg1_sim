@@ -66,7 +66,7 @@ def snr_test_plot(h, codebook, basic_dict, trans):
             classification = utils.trans_decode(codebook, datasets[index], trans)
             trans_error = np.sum(classification != true_classification) / val_size
             trans_errors[index] = trans_error
-            classification = np.apply_along_axis(lambda a: np.argmin(LA.norm(basic_dict['mean_sol']-a.T)), axis=1, arr=datasets[index])
+            classification = np.apply_along_axis(lambda a: np.argmin(LA.norm(basic_dict['mean_sol']-a, axis=1)), axis=1, arr=datasets[index])
             mean_sol_error = np.sum(classification != true_classification) / val_size
             mean_sol_errors[index] = mean_sol_error
             if i == 0:
@@ -230,7 +230,7 @@ def main():
         d_x = 2
         d_y = 2
         basic_dict = {"d_x": d_x, "d_y": d_y, "m": 16, "n": 160, "test_n_ratio": 4, "iterations": 1600,
-                      "scale_lambda": (0.0158, 0.0158),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 3, "codebook_type": "Grid",
+                      "scale_lambda": (0.0229, 0.0229),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 3, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.01, "snr_steps": 10,
                       "snr_seed": 6, "trans_type": "Quadratic", "max_eigenvalue": 1, "min_eigenvalue": 0.8,
                       "lambda_range": [-2, -1], "batch_size": 1, "with_s": True, "model": "LTNN"}
@@ -300,7 +300,7 @@ if __name__ == '__main__':
     load_s_array = False
     load_errors = False
     save = True
-    snr_test = True
+    snr_test = False
     just_replot_SNR = False
     lambda_sweep = False
 
