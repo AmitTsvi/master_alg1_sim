@@ -306,7 +306,7 @@ def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors
         if i == 0:
             ax.plot(iter_axis, train_errors, linewidth=2, color='blue')
             ax.plot(iter_axis, cov_train_errors, color='black', linestyle='dashed', linewidth=2)
-            plt.title('Test Error')
+            plt.title('Train Error')
             plt.savefig('Train_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         else:
             ax.plot(iter_axis, test_errors, linewidth=2, color='blue')
