@@ -192,6 +192,12 @@ def plot_dataset(dataset, snr, codebook, basic_dict):
     plt.close()
 
 
+def mean_solution(basic_dict, train_dataset):
+    sample_per_word = int(basic_dict['n']/basic_dict['m'])
+    trans_codebook = [np.mean(train_dataset[sample_per_word*i:sample_per_word*(i+1)-1], axis=0) for i in range(basic_dict['m'])]
+    return np.array(trans_codebook)
+
+
 def delta_array(codebook, basic_dict):
     L = int(basic_dict['m'] * (basic_dict['m'] - 1) / 2)
     deltas = np.zeros((L, basic_dict['d_x']))

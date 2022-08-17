@@ -7,12 +7,6 @@ import pickle
 import os
 
 
-def mean_solution(basic_dict, train_dataset):
-    sample_per_word = int(basic_dict['n']/basic_dict['m'])
-    trans_codebook = [np.mean(train_dataset[sample_per_word*i:sample_per_word*(i+1)-1], axis=0) for i in range(basic_dict['m'])]
-    return np.array(trans_codebook)
-
-
 def plot_pegasos(h_array, s_array, codebook, train_dataset, test_dataset, basic_dict, trans, lambda_scale=None):
     train_errors = []
     test_errors = []
@@ -254,7 +248,7 @@ def main():
                                                  channel_trans)
     test_dataset = utils.dataset_transform_LTNN(codebook, test_noise_dataset, basic_dict,
                                                 basic_dict["test_n_ratio"]*basic_dict['n'], channel_trans)
-    basic_dict['mean_sol'] = mean_solution(basic_dict, train_dataset)
+    basic_dict['mean_sol'] = utils.mean_solution(basic_dict, train_dataset)
     utils.plot_dataset(train_dataset, basic_dict['train_snr'], codebook, basic_dict)
     if not load_s_array:
         deltas = utils.delta_array(codebook, basic_dict)
@@ -270,8 +264,8 @@ def main():
             h_array, s_array = subgradient_alg(basic_dict, codebook, train_dataset, basic_dict['scale_lambda'], partition)
             print("Finished running alg, now testing")
     if load_errors:
-        utils.plot_error_rate(basic_dict['train_errors'], basic_dict['iterations']*[basic_dict['cov_train_error']],
-                              basic_dict['test_errors'], basic_dict['iterations']*[basic_dict['cov_test_error']])
+        utils.plot_error_rate(basic_dict['train_errors'], len(basic_dict['train_errors'])*[basic_dict['cov_train_error']],
+                              basic_dict['test_errors'], len(basic_dict['test_errors'])*[basic_dict['cov_test_error']])
     else:
         train_errors, test_errors, cov_train_error, cov_test_error = plot_pegasos(h_array, s_array, codebook,
                                                                                   train_dataset, test_dataset,
