@@ -238,8 +238,11 @@ def decode(codebook, dataset, m, n, d, S):
 
 
 def decode_LTNN(codebook, dataset, m, n, d, H):
-    decode_sample_LTNN = lambda a, cb, h: np.argmin([LA.norm(a - h @ c) for c in cb])
-    classification = np.apply_along_axis(decode_sample_LTNN, 1, dataset, codebook, H)
+    transformed_codebook = (H @ codebook.T).T
+    exmaples_minus_codewords = np.repeat(dataset, m, axis=0) - np.tile(transformed_codebook, (n, 1))
+    a = np.einsum('ij,ji->i', exmaples_minus_codewords, exmaples_minus_codewords.T)
+    b = np.reshape(a, (n, m))
+    classification = np.argmin(b, axis=1)
     return classification
 
 
