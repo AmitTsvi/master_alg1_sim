@@ -198,8 +198,8 @@ def main():
         os.chdir(owd)
         utils.make_run_dir(load, workdir, basic_dict)
     else:
-        d = 4
-        basic_dict = {"d_x": d, "d_y": d, "m": 256, "n": 32, "test_n_ratio": 4, "iterations": 800,
+        d = 2
+        basic_dict = {"d_x": d, "d_y": d, "m": 16, "n": 16, "test_n_ratio": 4, "iterations": 300,
                       "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 61, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.05, "snr_steps": 10,
                       "snr_seed": 6, "lambda_range": [-2, -1], "batch_size": 1, "model": "MNN"}
@@ -258,7 +258,7 @@ if __name__ == '__main__':
     load_s_array = False
     load_errors = False
     save = True
-    snr_test = True
+    snr_test = False
     just_replot_SNR = False
     lambda_sweep = False
 

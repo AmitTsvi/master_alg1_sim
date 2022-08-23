@@ -24,9 +24,6 @@ def gen_codebook(basic_dict):
         return rv.rvs(basic_dict['m']), cov  # codebook is m x d
     if basic_dict['codebook_type'] == "Grid":
         codewords_per_axis = int(np.ceil(basic_dict['m']**(1/basic_dict['d_x'])))
-        # grid = list(multiset_permutations(np.linspace(-1, 1, codewords_per_axis), d))
-        # repetitions = [d*[e] for e in np.linspace(-1, 1, codewords_per_axis) if e != 0]
-        # complete_grid = np.array(grid+repetitions)
         grid = [list(p) for p in itertools.product(np.linspace(-1, 1, codewords_per_axis), repeat=basic_dict['d_x'])]
         if codewords_per_axis % 2 == 1:
             grid.remove(basic_dict['d_x']*[0.0])
@@ -232,9 +229,11 @@ def single_to_double_index(l, m):
 
 
 def decode(codebook, dataset, m, n, d, S):
-    decode_sample = lambda a, cb, S: np.argmin([distance.mahalanobis(a, c, S) for c in cb])
     examples = dataset.reshape(m*n, d)
-    classification = np.apply_along_axis(decode_sample, 1, examples, codebook, S)
+    exmaples_minus_codewords = np.repeat(examples, m, axis=0) - np.tile(codebook, (m*n, 1))
+    a = np.einsum('ij,ji->i', exmaples_minus_codewords@S, exmaples_minus_codewords.T)
+    b = np.reshape(a, (n*m, m))
+    classification = np.argmin(b, axis=1)
     return classification
 
 
