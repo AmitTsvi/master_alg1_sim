@@ -156,14 +156,14 @@ def rebuild_trans_from_kernel(f_kernel, trans_type):
     return f
 
 
-def dataset_transform(codebook, noise_dataset, n, basic_dict):
+def dataset_transform(codebook, noise_dataset, n, basic_dict):  # moved
     dataset = np.zeros((basic_dict['m'], n, basic_dict['d_x']))  # dataset is m x n x d
     for i in range(len(codebook)):
         dataset[i] = noise_dataset + codebook[i]
     return dataset
 
 
-def dataset_transform_LTNN(codebook, noise_dataset, basic_dict, n, trans):
+def dataset_transform_LTNN(codebook, noise_dataset, basic_dict, n, trans):  # moved
     transformed_codewords = np.array([trans(x) for x in codebook])
     dup_trans_codewords = np.repeat(transformed_codewords, int(n/basic_dict['m']), axis=0)  # n x d_y
     return dup_trans_codewords + noise_dataset
@@ -189,7 +189,7 @@ def plot_dataset(dataset, snr, codebook, basic_dict):
     plt.close()
 
 
-def mean_solution(basic_dict, train_dataset):
+def mean_solution(basic_dict, train_dataset):  # moved
     sample_per_word = int(basic_dict['n']/basic_dict['m'])
     trans_codebook = [np.mean(train_dataset[sample_per_word*i:sample_per_word*(i+1)-1], axis=0) for i in range(basic_dict['m'])]
     return np.array(trans_codebook)
@@ -228,7 +228,7 @@ def single_to_double_index(l, m):
     return i, j
 
 
-def decode(codebook, dataset, m, n, d, S):
+def decode(codebook, dataset, m, n, d, S):  # moved
     examples = dataset.reshape(m*n, d)
     exmaples_minus_codewords = np.repeat(examples, m, axis=0) - np.tile(codebook, (m*n, 1))
     a = np.einsum('ij,ji->i', exmaples_minus_codewords@S, exmaples_minus_codewords.T)
@@ -237,7 +237,7 @@ def decode(codebook, dataset, m, n, d, S):
     return classification
 
 
-def decode_LTNN(codebook, dataset, m, n, d, H):
+def decode_LTNN(codebook, dataset, m, n, d, H):  # moved
     transformed_codebook = (H @ codebook.T).T
     exmaples_minus_codewords = np.repeat(dataset, m, axis=0) - np.tile(transformed_codebook, (n, 1))
     a = np.einsum('ij,ji->i', exmaples_minus_codewords, exmaples_minus_codewords.T)
@@ -246,7 +246,7 @@ def decode_LTNN(codebook, dataset, m, n, d, H):
     return classification
 
 
-def trans_decode(codebook, dataset, trans):
+def trans_decode(codebook, dataset, trans):  # moved
     inv_trans = lambda y, cb: np.argmin([distance.euclidean(trans(c), y) for c in cb])
     classification = np.apply_along_axis(inv_trans, 1, dataset, codebook)
     return classification

@@ -215,7 +215,6 @@ def main():
         test_noise_dataset, _, _ = utils.gen_noise_dataset(basic_dict, 4*basic_dict['n'], noise_cov, mix_dist)
     dataset = utils.dataset_transform(codebook, noise_dataset, basic_dict['n'], basic_dict)
     test_dataset = utils.dataset_transform(codebook, test_noise_dataset, 4*basic_dict['n'], basic_dict)
-    basic_dict['mean_sol'] = utils.mean_solution(basic_dict, dataset)
     utils.plot_dataset(dataset, basic_dict['train_snr'], codebook, basic_dict)
     if not load_s_array:
         deltas = utils.delta_array(codebook, basic_dict)
