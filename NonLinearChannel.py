@@ -2,6 +2,7 @@ from CommChannel import CommChannel
 import numpy as np
 import utils
 from scipy.spatial import distance
+from numpy import linalg as LA
 
 
 class NonLinearChannel(CommChannel):
