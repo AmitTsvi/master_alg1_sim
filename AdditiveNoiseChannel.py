@@ -16,11 +16,11 @@ class AdditiveNoiseChannel(CommChannel):
 
     def init_dict(self):
         d = 2
-        basic_dict = {"d_x": d, "d_y": d, "m": 16, "n": 16, "test_n_ratio": 4, "iterations": 300,
-                      "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 61, "codebook_type": "Grid",
-                      "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.05, "snr_steps": 10,
-                      "snr_seed": 6, "lambda_range": [-2, -1], "batch_size": 1, "model": "MNN", "iter_gap": 20,
-                      "snr_val_size": 1000, "snr_test_cycles": 20}
+        basic_dict = {"d_x": d, "d_y": d, "m": 64, "n": 32, "test_n_ratio": 4, "iterations": 800,
+                      "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 132, "codebook_type": "Grid",
+                      "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.03, "snr_steps": 10,
+                      "snr_seed": 777, "lambda_range": [-2, -1], "batch_size": 1, "model": "MNN", "iter_gap": 20,
+                      "snr_val_size": 5000, "snr_test_cycles": 20}
         return basic_dict
 
     def get_rule(self, basic_dict):

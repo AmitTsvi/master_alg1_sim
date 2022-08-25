@@ -3,6 +3,7 @@ import pickle
 import numpy as np
 import utils
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 
 class CommChannel(ABC):
@@ -166,7 +167,8 @@ class CommChannel(ABC):
         rule = self.get_rule(basic_dict)
         true_classification = self.get_true_classification(basic_dict, val_size)
         for i in range(n_cycles):
-            print("SNR Test Number " + str(i))
+            now = datetime.now()
+            print("SNR Test Number " + str(i) + " Started at " + now.strftime("%Y_%m_%d_%H%M%S"))
             datasets = []
             for n_energy in noise_energy_range:
                 new_snr_dataset, _, _ = utils.gen_noise_dataset(basic_dict, val_size, basic_dict['noise_cov'], basic_dict['mix_dist'], n_energy)
