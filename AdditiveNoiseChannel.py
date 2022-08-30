@@ -15,11 +15,11 @@ class AdditiveNoiseChannel(CommChannel):
         return [s_array]
 
     def init_dict(self):
-        d = 2
-        basic_dict = {"d_x": d, "d_y": d, "m": 64, "n": 32, "test_n_ratio": 4, "iterations": 800,
-                      "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 132, "codebook_type": "Grid",
-                      "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.03, "snr_steps": 10,
-                      "snr_seed": 777, "lambda_range": [-2, -1], "batch_size": 1, "model": "MNN", "iter_gap": 20,
+        d = 3
+        basic_dict = {"d_x": d, "d_y": d, "m": 64, "n": 1000, "test_n_ratio": 4, "iterations": 500,
+                      "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 3, "codebook_type": "Grid",
+                      "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.008, "snr_steps": 10,
+                      "snr_seed": 777, "lambda_range": [-4, -1], "batch_size": 10, "model": "MNN", "iter_gap": 2,
                       "snr_val_size": 5000, "snr_test_cycles": 20}
         return basic_dict
 
@@ -43,24 +43,25 @@ class AdditiveNoiseChannel(CommChannel):
         s_array = []
         s = np.zeros((basic_dict['d_x'], basic_dict['d_x']))
         for t in range(1, basic_dict['iterations'] + 1):
-            p_t = np.random.randint(basic_dict['m'] - 1)
-            q_t = np.random.randint(p_t + 1, basic_dict['m'])
-            x_p_t = np.expand_dims(codebook[p_t], axis=1)
-            x_q_t = np.expand_dims(codebook[q_t], axis=1)
-            z_t = np.random.randint(basic_dict['n'])
-            which_word = np.random.randint(2)
-            y_t = np.expand_dims(dataset[p_t, z_t] if which_word == 0 else dataset[q_t, z_t], axis=1)
-            delta_p_q_t = np.expand_dims(deltas[utils.double_to_single_index(p_t, q_t, basic_dict['m'])], axis=1)
-            a_t = ((-1) ** which_word) * (y_t - 0.5 * (x_p_t + x_q_t))
             v_t = 0
-            if a_t.T @ s @ delta_p_q_t < 1:
-                v_t = 0.5 * (delta_p_q_t @ a_t.T + a_t @ delta_p_q_t.T)
+            for k in range(basic_dict["batch_size"]):
+                p_t = np.random.randint(basic_dict['m'] - 1)
+                q_t = np.random.randint(p_t + 1, basic_dict['m'])
+                x_p_t = np.expand_dims(codebook[p_t], axis=1)
+                x_q_t = np.expand_dims(codebook[q_t], axis=1)
+                z_t = np.random.randint(basic_dict['n'])
+                which_word = np.random.randint(2)
+                y_t = np.expand_dims(dataset[p_t, z_t] if which_word == 0 else dataset[q_t, z_t], axis=1)
+                delta_p_q_t = np.expand_dims(deltas[utils.double_to_single_index(p_t, q_t, basic_dict['m'])], axis=1)
+                a_t = ((-1) ** which_word) * (y_t - 0.5 * (x_p_t + x_q_t))
+                if a_t.T @ s @ delta_p_q_t < 1:
+                    v_t += 0.5 * (delta_p_q_t @ a_t.T + a_t @ delta_p_q_t.T)
             grad_t = 0
             for i, p_i in enumerate(partition):
                 delta_p_q_star = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
                 grad_t += basic_dict['etas'][i] * (
                             s @ delta_p_q_star @ delta_p_q_star.T + delta_p_q_star @ delta_p_q_star.T @ s)
-            grad_t = scale_lambda * grad_t - v_t
+            grad_t = scale_lambda * grad_t - v_t / basic_dict["batch_size"]
             s -= (1 / (scale_lambda * t)) * grad_t
             s = utils.get_near_psd(s)
             s_array.append(s)
