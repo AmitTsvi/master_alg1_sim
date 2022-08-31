@@ -1,4 +1,5 @@
 from scipy.stats import multivariate_normal
+from scipy.stats import multivariate_t
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import distance
@@ -52,10 +53,10 @@ def gen_codebook(basic_dict):
         return np.array(outer_circle+inner), None
 
 
-def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None, noise_energy=None):
+def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None, noise_energy=None, df=None):
     if noise_energy is None:
         noise_energy = basic_dict['noise_energy']
-    if basic_dict['noise_type'] in ["Gaussian", "WhiteGaussian"]:
+    if basic_dict['noise_type'] in ["Gaussian", "WhiteGaussian", "student_t"]:
         mu = basic_dict['d_y']*[0]
         if noise_cov is None:
             if basic_dict['noise_type'] == "WhiteGaussian":
@@ -68,8 +69,16 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None, noise_energy
         else:
             cov_diag = noise_cov.diagonal()
             cov = (noise_energy/np.sum(cov_diag))*noise_cov
-        rv = multivariate_normal(mu, cov)
-        return rv.rvs(n), cov, None  # noise samples are n x d
+        if basic_dict['noise_type'] in ["Gaussian", "WhiteGaussian"]:
+            rv = multivariate_normal(mu, cov)
+            d_freedom = None
+        else:
+            if df is None:
+                d_freedom = np.random.randint(low=1, high=11)
+            else:
+                d_freedom = df
+            rv = multivariate_t(shape=cov, df=d_freedom)
+        return rv.rvs(n), cov, None, d_freedom  # noise samples are n x d
     if basic_dict['noise_type'] == "Mixture":
         mu = basic_dict['d_y'] * [0]
         if noise_cov is None:
@@ -91,7 +100,7 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None, noise_energy
         rvs = [multivariate_normal(mu, covs[i]) for i in range(n_gaussians)]
         mixture_idx = np.random.choice(len(mixture_dist), size=n, replace=True, p=mixture_dist)
         samples = np.array([rvs[idx].rvs(1) for idx in mixture_idx])
-        return samples, covs, mixture_dist
+        return samples, covs, mixture_dist, None
 
 
 def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):

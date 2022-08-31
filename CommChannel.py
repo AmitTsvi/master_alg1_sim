@@ -73,11 +73,12 @@ class CommChannel(ABC):
         return codebook
 
     def gen_noise_datasets(self, basic_dict):
-        train_noise_dataset, noise_cov, mix_dist = utils.gen_noise_dataset(basic_dict, basic_dict['n'])
+        train_noise_dataset, noise_cov, mix_dist, df = utils.gen_noise_dataset(basic_dict, basic_dict['n'])
         basic_dict['noise_cov'] = noise_cov
         basic_dict['mix_dist'] = mix_dist
-        test_noise_dataset, _, _ = utils.gen_noise_dataset(basic_dict, basic_dict["test_n_ratio"]*basic_dict['n'],
-                                                           noise_cov, mix_dist)
+        basic_dict['df'] = df
+        test_noise_dataset, _, _, _ = utils.gen_noise_dataset(basic_dict, basic_dict["test_n_ratio"]*basic_dict['n'],
+                                                           noise_cov, mix_dist, None, df)
         return train_noise_dataset, test_noise_dataset
 
     @abstractmethod
@@ -171,7 +172,7 @@ class CommChannel(ABC):
             print("SNR Test Number " + str(i) + " Started at " + now.strftime("%Y_%m_%d_%H%M%S"))
             datasets = []
             for n_energy in noise_energy_range:
-                new_snr_dataset, _, _ = utils.gen_noise_dataset(basic_dict, val_size, basic_dict['noise_cov'], basic_dict['mix_dist'], n_energy)
+                new_snr_dataset, _, _, _ = utils.gen_noise_dataset(basic_dict, val_size, basic_dict['noise_cov'], basic_dict['mix_dist'], n_energy, basic_dict['df'])
                 new_snr_trans = self.transform_dataset(codebook, new_snr_dataset, basic_dict, rule)
                 datasets.append(new_snr_trans)
             errors = np.zeros(len(basic_dict['snr_range']))
@@ -208,6 +209,8 @@ class CommChannel(ABC):
         file1.write("Number of train samples: " + str(basic_dict['n']) + "\n")
         file1.write("Number of test samples: " + str(basic_dict['n']*basic_dict['test_n_ratio']) + "\n")
         file1.write("Noise type: " + basic_dict['noise_type'] + "\n")
+        if basic_dict['df'] is not None:
+            file1.write("Degrees of freedom: " + str(basic_dict['df']) + "\n")
         file1.write("Noise energy: " + str(basic_dict['noise_energy']) + "\n")
         file1.write("Training SNR: " + str(basic_dict['train_snr']) + "\n")
         if self.snr_test:
@@ -280,6 +283,6 @@ class CommChannel(ABC):
             self.run_snr_test(basic_dict, codebook, solution)
         if self.just_replot_SNR:
             utils.plot_snr_error_rate(basic_dict['snr_errors'], basic_dict['snr_rule_errors'], basic_dict)
-        self.log_run_info(basic_dict)
         if self.save:
             self.save_data(codebook, train_noise_dataset, test_noise_dataset, solution, basic_dict)
+        self.log_run_info(basic_dict)
