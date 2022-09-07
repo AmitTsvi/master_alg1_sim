@@ -131,6 +131,7 @@ class CommChannel(ABC):
         basic_dict['test_errors'] = test_errors
         basic_dict['train_rule_error'] = train_rule_error
         basic_dict['test_rule_error'] = test_rule_error
+        basic_dict['min_test_iter'] = 50+np.argmin(test_errors[50:])
 
     @abstractmethod
     def get_true_classification(self, basic_dict, test_n):
@@ -152,7 +153,7 @@ class CommChannel(ABC):
         snr_range = list(np.linspace(basic_dict['train_snr'] - 10, basic_dict['train_snr'] + 10, 2 * basic_dict['snr_steps']))
         snr_range.append(basic_dict['train_snr'])
         basic_dict['snr_range'] = list(np.sort(snr_range))
-        errors, rule_errors, naive_errors = self.perform_snr_test(solution[0][-1], codebook, basic_dict)
+        errors, rule_errors, naive_errors = self.perform_snr_test(solution[0][basic_dict['min_test_iter']], codebook, basic_dict)
         basic_dict['snr_errors'] = errors
         basic_dict['snr_rule_errors'] = rule_errors
         basic_dict['snr_naive_errors'] = naive_errors
@@ -238,6 +239,10 @@ class CommChannel(ABC):
         if basic_dict['mix_dist'] is not None:
             file1.write("Gaussian mixture distribution:" + "\n")
             file1.write(str(basic_dict['mix_dist']) + "\n")
+        file1.write("Iteration with minimum test error: " + str(basic_dict['min_test_iter']) + "\n")
+        file1.write("Matrix initialization: " + str(basic_dict['init_matrix']) + "\n")
+        file1.write("Loss multiplicative weight: " + str(basic_dict['loss_weight']) + "\n")
+        file1.write("SGD run seed: " + str(basic_dict['batch_seed']) + "\n")
         file1.close()
 
     def save_data(self, codebook, train_noise_dataset, test_noise_dataset, solution, basic_dict):
