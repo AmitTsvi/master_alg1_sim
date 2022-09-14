@@ -82,7 +82,7 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None, noise_energy
     if basic_dict['noise_type'] == "Mixture":
         mu = basic_dict['d_y'] * [0]
         if noise_cov is None:
-            n_gaussians = np.random.randint(3, 10)
+            n_gaussians = np.random.randint(2, 5)
             mixture_dist = np.abs(np.random.normal(0, 1, size=n_gaussians))
             mixture_dist = mixture_dist / np.sum(mixture_dist)
             covs = np.random.normal(0, 1, size=(n_gaussians, basic_dict['d_y'], basic_dict['d_y']))

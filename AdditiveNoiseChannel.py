@@ -42,6 +42,7 @@ class AdditiveNoiseChannel(CommChannel):
 
     def subgradient_alg(self, basic_dict, codebook, dataset, scale_lambda, partition, deltas):
         s_array = []
+        np.random.seed(basic_dict['batch_seed'])
         if basic_dict['init_matrix'] == "identity":
             s = np.eye(basic_dict['d_x'])
         else:
