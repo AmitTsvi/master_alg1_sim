@@ -53,7 +53,19 @@ def gen_codebook(basic_dict):
         return np.array(outer_circle+inner), None
 
 
-def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None, noise_energy=None, df=None):
+def gen_multimodal_means(basic_dict, n_gaussians, mix_dist):
+    means = []
+    reminder = n_gaussians % 2
+    for i in range(int(basic_dict['d_y'])):
+        select = np.random.randint(n_gaussians-reminder, size=n_gaussians//2)
+        line = [0.001*(-1)**(i in select) for i in range(n_gaussians-reminder)]
+        if reminder:
+            line.append(0)
+        means.append(np.divide(line, mix_dist))
+    return np.transpose(np.array(means))
+
+
+def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_means=None, mix_dist=None, noise_energy=None, df=None):
     if noise_energy is None:
         noise_energy = basic_dict['noise_energy']
     if basic_dict['noise_type'] in ["Gaussian", "WhiteGaussian", "student_t"]:
@@ -78,14 +90,14 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None, noise_energy
             else:
                 d_freedom = df
             rv = multivariate_t(shape=cov, df=d_freedom)
-        return rv.rvs(n), cov, None, d_freedom  # noise samples are n x d
+        return rv.rvs(n), cov, None, None, d_freedom  # noise samples are n x d
     if basic_dict['noise_type'] == "Mixture":
-        mu = basic_dict['d_y'] * [0]
         if noise_cov is None:
             n_gaussians = np.random.randint(2, 5)
             mixture_dist = np.abs(np.random.normal(0, 1, size=n_gaussians))
             mixture_dist = mixture_dist / np.sum(mixture_dist)
             covs = np.random.normal(0, 1, size=(n_gaussians, basic_dict['d_y'], basic_dict['d_y']))
+            means = gen_multimodal_means(basic_dict, n_gaussians, mixture_dist)
             for i, cov in enumerate(covs):
                 cov = np.dot(cov, cov.transpose())
                 cov_diag = cov.diagonal()
@@ -94,13 +106,14 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_dist=None, noise_energy
             n_gaussians = len(noise_cov)
             mixture_dist = mix_dist
             covs = noise_cov
+            means = mix_means
             for i, cov in enumerate(covs):
                 cov_diag = cov.diagonal()
                 covs[i] = (noise_energy / np.sum(cov_diag)) * cov
-        rvs = [multivariate_normal(mu, covs[i]) for i in range(n_gaussians)]
+        rvs = [multivariate_normal(means[i], covs[i]) for i in range(n_gaussians)]
         mixture_idx = np.random.choice(len(mixture_dist), size=n, replace=True, p=mixture_dist)
         samples = np.array([rvs[idx].rvs(1) for idx in mixture_idx])
-        return samples, covs, mixture_dist, None
+        return samples, covs, means, mixture_dist, None
 
 
 def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):

@@ -16,12 +16,11 @@ class AdditiveNoiseChannel(CommChannel):
 
     def init_dict(self):
         d = 2
-        basic_dict = {"d_x": d, "d_y": d, "m": 16, "n": 160, "test_n_ratio": 4, "iterations": 500,
-                      "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 3, "codebook_type": "Grid",
-                      "codeword_energy": 1, "noise_type": "student_t", "noise_energy": 0.02, "snr_steps": 10,
+        basic_dict = {"d_x": d, "d_y": d, "m": 64, "n": 200, "test_n_ratio": 4, "iterations": 500,
+                      "scale_lambda": 10**4, "etas": (d+1)*[1/(d+1)], "seed": 3, "codebook_type": "Grid",
+                      "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.04, "snr_steps": 10,
                       "snr_seed": 777, "lambda_range": [-4, -1], "batch_size": 20, "model": "MNN", "iter_gap": 1,
-                      "snr_val_size": 5000, "snr_test_cycles": 20, "init_matrix": "identity", "loss_weight": 10000,
-                      "batch_seed": 752}
+                      "snr_val_size": 5000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 752}
         return basic_dict
 
     def get_rule(self, basic_dict):
@@ -66,7 +65,7 @@ class AdditiveNoiseChannel(CommChannel):
                 delta_p_q_star = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
                 grad_t += basic_dict['etas'][i] * (
                             s @ delta_p_q_star @ delta_p_q_star.T + delta_p_q_star @ delta_p_q_star.T @ s)
-            grad_t = scale_lambda * grad_t - basic_dict["loss_weight"] * v_t / basic_dict["batch_size"]
+            grad_t = scale_lambda * grad_t - v_t / basic_dict["batch_size"]
             s -= (1 / (scale_lambda * t)) * grad_t
             s = utils.get_near_psd(s)
             s_array.append(s)

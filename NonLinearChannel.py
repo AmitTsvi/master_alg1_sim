@@ -26,8 +26,7 @@ class NonLinearChannel(CommChannel):
                       "scale_lambda": (0.0229, 0.0229),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 3, "codebook_type": "Grid",
                       "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.01, "snr_steps": 10,
                       "snr_seed": 6, "lambda_range": [-2, -1], "batch_size": 1, "model": "LTNN", "iter_gap": 1,
-                      "snr_val_size": 5000, "snr_test_cycles": 20, "init_matrix": "identity", "loss_weight": 1000,
-                      "batch_seed": 752,
+                      "snr_val_size": 5000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 752,
                        "trans_type": "Quadratic", "max_eigenvalue": 1, "min_eigenvalue": 0.8, "with_s": True}
         return basic_dict
 
@@ -90,8 +89,8 @@ class NonLinearChannel(CommChannel):
                 grad_h_t += basic_dict['etas'][i] * 2 * (h @ delta_h @ delta_h.T)
                 delta_s = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
                 grad_s_t += basic_dict['etas'][i] * (s @ delta_s @ delta_s.T + delta_s @ delta_s.T @ s)
-            grad_h_t = scale_lambda[0] * grad_h_t - basic_dict["loss_weight"] * v_h_t / (basic_dict["batch_size"] * (basic_dict['m'] - 1))
-            grad_s_t = scale_lambda[1] * grad_s_t + basic_dict["loss_weight"] * 0.25 * v_s_t / (basic_dict["batch_size"] * (basic_dict['m'] - 1))
+            grad_h_t = scale_lambda[0] * grad_h_t - v_h_t / (basic_dict["batch_size"] * (basic_dict['m'] - 1))
+            grad_s_t = scale_lambda[1] * grad_s_t + 0.25 * v_s_t / (basic_dict["batch_size"] * (basic_dict['m'] - 1))
             if scale_lambda[0] == 0 or scale_lambda[1] == 0:
                 h -= (1 / t) * grad_h_t
                 s -= (1 / t) * grad_s_t

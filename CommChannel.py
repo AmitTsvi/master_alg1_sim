@@ -73,12 +73,13 @@ class CommChannel(ABC):
         return codebook
 
     def gen_noise_datasets(self, basic_dict):
-        train_noise_dataset, noise_cov, mix_dist, df = utils.gen_noise_dataset(basic_dict, basic_dict['n'])
+        train_noise_dataset, noise_cov, mix_means, mix_dist, df = utils.gen_noise_dataset(basic_dict, basic_dict['n'])
         basic_dict['noise_cov'] = noise_cov
         basic_dict['mix_dist'] = mix_dist
+        basic_dict['mix_means'] = mix_means
         basic_dict['df'] = df
-        test_noise_dataset, _, _, _ = utils.gen_noise_dataset(basic_dict, basic_dict["test_n_ratio"]*basic_dict['n'],
-                                                           noise_cov, mix_dist, None, df)
+        test_noise_dataset, _, _, _, _ = utils.gen_noise_dataset(basic_dict, basic_dict["test_n_ratio"]*basic_dict['n'],
+                                                           noise_cov, mix_means, mix_dist, None, df)
         return train_noise_dataset, test_noise_dataset
 
     @abstractmethod
@@ -173,7 +174,9 @@ class CommChannel(ABC):
             print("SNR Test Number " + str(i) + " Started at " + now.strftime("%Y_%m_%d_%H%M%S"))
             datasets = []
             for n_energy in noise_energy_range:
-                new_snr_dataset, _, _, _ = utils.gen_noise_dataset(basic_dict, val_size, basic_dict['noise_cov'], basic_dict['mix_dist'], n_energy, basic_dict['df'])
+                new_snr_dataset, _, _, _, _ = utils.gen_noise_dataset(basic_dict, val_size, basic_dict['noise_cov'],
+                                                                      basic_dict['mix_means'], basic_dict['mix_dist'],
+                                                                      n_energy, basic_dict['df'])
                 new_snr_trans = self.transform_dataset(codebook, new_snr_dataset, basic_dict, rule)
                 datasets.append(new_snr_trans)
             errors = np.zeros(len(basic_dict['snr_range']))
@@ -236,12 +239,14 @@ class CommChannel(ABC):
         if basic_dict['noise_cov'] is not None:
             file1.write("Random noise covariance(s):" + "\n")
             file1.write(str(basic_dict['noise_cov']) + "\n")
+        if basic_dict['mix_means'] is not None:
+            file1.write("Random noise mean(s):" + "\n")
+            file1.write(str(basic_dict['mix_means']) + "\n")
         if basic_dict['mix_dist'] is not None:
             file1.write("Gaussian mixture distribution:" + "\n")
             file1.write(str(basic_dict['mix_dist']) + "\n")
         file1.write("Iteration with minimum test error: " + str(basic_dict['min_test_iter']) + "\n")
         file1.write("Matrix initialization: " + str(basic_dict['init_matrix']) + "\n")
-        file1.write("Loss multiplicative weight: " + str(basic_dict['loss_weight']) + "\n")
         file1.write("SGD run seed: " + str(basic_dict['batch_seed']) + "\n")
         file1.close()
 
