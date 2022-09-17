@@ -127,11 +127,18 @@ class CommChannel(ABC):
         test_rule_classification = self.rule_decode(codebook, test_dataset, rule)
         train_rule_error = np.sum(train_rule_classification != train_true_classification) / len(train_true_classification)
         test_rule_error = np.sum(test_rule_classification != test_true_classification) / len(test_true_classification)
-        utils.plot_error_rate(train_errors, len(train_errors) * [train_rule_error], test_errors, len(test_errors) * [test_rule_error], lambda_scale, basic_dict['iter_gap'])
+        train_naive_classification = self.naive_decode(codebook, train_dataset)
+        test_naive_classification = self.naive_decode(codebook, test_dataset)
+        train_naive_error = np.sum(train_naive_classification != train_true_classification) / len(train_true_classification)
+        test_naive_error = np.sum(test_naive_classification != test_true_classification) / len(test_true_classification)
+        utils.plot_error_rate(train_errors, train_rule_error, train_naive_error, test_errors, test_rule_error,
+                              test_naive_error, lambda_scale, basic_dict['iter_gap'])
         basic_dict['train_errors'] = train_errors
         basic_dict['test_errors'] = test_errors
         basic_dict['train_rule_error'] = train_rule_error
         basic_dict['test_rule_error'] = test_rule_error
+        basic_dict['train_naive_error'] = train_naive_error
+        basic_dict['test_naive_error'] = test_naive_error
         basic_dict['min_test_iter'] = 50+np.argmin(test_errors[50:])
 
     @abstractmethod
@@ -285,10 +292,9 @@ class CommChannel(ABC):
         if not self.load_sol_array:
             solution = self.run_algorithm(basic_dict, codebook, train_dataset, test_dataset)
         elif self.load_errors:
-            utils.plot_error_rate(basic_dict['train_errors'],
-                                  len(basic_dict['train_errors']) * [basic_dict['train_rule_error']],
-                                  basic_dict['test_errors'],
-                                  len(basic_dict['test_errors']) * [basic_dict['test_rule_error']])
+            utils.plot_error_rate(basic_dict['train_errors'], basic_dict['train_rule_error'],
+                                  basic_dict['train_naive_error'], basic_dict['test_errors'],
+                                  basic_dict['test_rule_error'], basic_dict['test_naive_error'])
         if self.snr_test:
             self.run_snr_test(basic_dict, codebook, solution)
         if self.just_replot_SNR:

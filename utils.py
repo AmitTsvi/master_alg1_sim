@@ -58,7 +58,7 @@ def gen_multimodal_means(basic_dict, n_gaussians, mix_dist):
     reminder = n_gaussians % 2
     for i in range(int(basic_dict['d_y'])):
         select = np.random.randint(n_gaussians-reminder, size=n_gaussians//2)
-        line = [0.001*(-1)**(i in select) for i in range(n_gaussians-reminder)]
+        line = [0.5*basic_dict['noise_energy']*(-1)**(i in select) for i in range(n_gaussians-reminder)]
         if reminder:
             line.append(0)
         means.append(np.divide(line, mix_dist))
@@ -93,7 +93,7 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_means=None, mix_dist=No
         return rv.rvs(n), cov, None, None, d_freedom  # noise samples are n x d
     if basic_dict['noise_type'] == "Mixture":
         if noise_cov is None:
-            n_gaussians = np.random.randint(2, 5)
+            n_gaussians = 2*np.random.randint(1, 3)
             mixture_dist = np.abs(np.random.normal(0, 1, size=n_gaussians))
             mixture_dist = mixture_dist / np.sum(mixture_dist)
             covs = np.random.normal(0, 1, size=(n_gaussians, basic_dict['d_y'], basic_dict['d_y']))
@@ -280,7 +280,7 @@ def make_run_dir(load, load_dir, basic_dict):
     os.chdir(fin_string)
 
 
-def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors, lambda_scale=None, iter_gap=1):
+def plot_error_rate(train_errors, train_rule_error, train_naive_error, test_errors, test_rule_error, test_naive_error, lambda_scale=None, iter_gap=1):
     for i in range(2):
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -292,12 +292,16 @@ def plot_error_rate(train_errors, cov_train_errors, test_errors, cov_test_errors
         iter_axis = [iter_gap*j for j in range(len(train_errors))]
         if i == 0:
             ax.plot(iter_axis, train_errors, linewidth=2, color='blue')
-            ax.plot(iter_axis, cov_train_errors, color='black', linestyle='dashed', linewidth=2)
+            ax.plot(iter_axis, len(iter_axis)*[train_rule_error], color='black', linestyle='dashed', linewidth=2)
+            ax.plot(iter_axis, len(iter_axis)*[train_naive_error], color='red', linestyle='dashed', marker='s',
+                    linewidth=2)
             plt.title('Train Error')
             plt.savefig('Train_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         else:
             ax.plot(iter_axis, test_errors, linewidth=2, color='blue')
-            ax.plot(iter_axis, cov_test_errors, color='black', linestyle='dashed', linewidth=2)
+            ax.plot(iter_axis, len(iter_axis)*[test_rule_error], color='black', linestyle='dashed', linewidth=2)
+            ax.plot(iter_axis, len(iter_axis)*[test_naive_error], color='red', linestyle='dashed', marker='s',
+                    linewidth=2)
             plt.title('Test Error')
             plt.savefig('Test_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         plt.close()
