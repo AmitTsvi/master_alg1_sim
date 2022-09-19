@@ -36,10 +36,12 @@ def gen_codebook(basic_dict):
         return np.array([(math.cos(2*pi/basic_dict['m']*x), math.sin(2*pi/basic_dict['m']*x)) for x in range(basic_dict['m'])]), None
     if basic_dict['codebook_type'] == "TwoCircles":
         pi = math.pi
-        outer_words = int(2*basic_dict['m']/3)
+        outer_words = basic_dict['m'] // 2
         inner_words = basic_dict['m'] - outer_words
-        outer_circle = [(math.cos(2*pi/outer_words*x), math.sin(2*pi/outer_words*x)) for x in range(outer_words)]
-        inner_circle = [(0.5*math.cos(2*pi/inner_words*x), 0.5*math.sin(2*pi/inner_words*x)) for x in range(inner_words)]
+        outer_radius = 0.5+0.5*(3**0.5)
+        inner_radius = 2**-0.5
+        outer_circle = [(outer_radius*math.cos(2*pi/outer_words*x), outer_radius*math.sin(2*pi/outer_words*x)) for x in range(outer_words)]
+        inner_circle = [(inner_radius*math.cos(2*pi/inner_words*x+pi/4), inner_radius*math.sin(2*pi/inner_words*x+pi/4)) for x in range(inner_words)]
         return np.array(outer_circle+inner_circle), None
     if basic_dict['codebook_type'] == "GridInCircle":
         pi = math.pi
@@ -292,16 +294,14 @@ def plot_error_rate(train_errors, train_rule_error, train_naive_error, test_erro
         iter_axis = [iter_gap*j for j in range(len(train_errors))]
         if i == 0:
             ax.plot(iter_axis, train_errors, linewidth=2, color='blue')
-            ax.plot(iter_axis, len(iter_axis)*[train_rule_error], color='black', linestyle='dashed', linewidth=2)
-            ax.plot(iter_axis, len(iter_axis)*[train_naive_error], color='red', linestyle='dashed', marker='s',
-                    linewidth=2)
+            ax.plot(iter_axis, len(iter_axis)*[train_rule_error], color='black', linestyle='dashed')
+            ax.plot(iter_axis, len(iter_axis)*[train_naive_error], color='red', linestyle='dashed')
             plt.title('Train Error')
             plt.savefig('Train_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         else:
             ax.plot(iter_axis, test_errors, linewidth=2, color='blue')
-            ax.plot(iter_axis, len(iter_axis)*[test_rule_error], color='black', linestyle='dashed', linewidth=2)
-            ax.plot(iter_axis, len(iter_axis)*[test_naive_error], color='red', linestyle='dashed', marker='s',
-                    linewidth=2)
+            ax.plot(iter_axis, len(iter_axis)*[test_rule_error], color='black', linestyle='dashed')
+            ax.plot(iter_axis, len(iter_axis)*[test_naive_error], color='red', linestyle='dashed')
             plt.title('Test Error')
             plt.savefig('Test_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         plt.close()
