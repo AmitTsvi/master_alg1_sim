@@ -7,6 +7,7 @@ import utils
 class AdditiveNoiseChannel(CommChannel):
     def __init__(self):
         super().__init__(model="MNN")
+        self.labels = [r'$S_T$', r'$\Sigma^{-1}$', r'$\hat{\Sigma}^{-1}$', r'$I$']
 
     def load_sol(self):
         f = open('s_array.npy', 'rb')
@@ -15,11 +16,11 @@ class AdditiveNoiseChannel(CommChannel):
         return [s_array]
 
     def init_dict(self):
-        d = 3
-        basic_dict = {"d_x": d, "d_y": d, "m": 64, "n": 200, "test_n_ratio": 4, "iterations": 1400,
-                      "scale_lambda": 300, "etas": (d+1)*[1/(d+1)], "seed": 14, "codebook_type": "Grid",
-                      "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.017, "snr_steps": 10,
-                      "snr_seed": 777, "lambda_range": [-4, -1], "batch_size": 20, "model": "MNN", "iter_gap": 1,
+        d = 2
+        basic_dict = {"d_x": d, "d_y": d, "m": 2, "n": 2000, "test_n_ratio": 4, "iterations": 600,
+                      "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 15, "codebook_type": "Custom",
+                      "codeword_energy": 1, "noise_type": "Custom", "noise_energy": 1.5, "snr_steps": 10,
+                      "snr_seed": 777, "lambda_range": [-4, -1], "batch_size": 50, "model": "MNN", "iter_gap": 1,
                       "snr_val_size": 5000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 752}
         return basic_dict
 
@@ -86,8 +87,15 @@ class AdditiveNoiseChannel(CommChannel):
     def rule_decode(self, codebook, dataset, precision):
         return self.decode(codebook, dataset, precision)
 
-    def naive_decode(self, codebook, dataset):
+    def no_learning_decode(self, codebook, dataset):
         return self.decode(codebook, dataset, np.eye(dataset.shape[2]))
+
+    def get_estimation_decoder(self, codebook, dataset, noise_dataset):
+        n, d = noise_dataset.shape
+        return (noise_dataset.T @ noise_dataset) / (n-1)
+
+    def estimator_decode(self, codebook, dataset, estimator):
+        return self.decode(codebook, dataset, estimator)
 
     def save_data(self, codebook, train_noise_dataset, test_noise_dataset, solution, basic_dict):
         super().save_data(codebook, train_noise_dataset, test_noise_dataset, solution, basic_dict)

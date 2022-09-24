@@ -1,5 +1,7 @@
 from scipy.stats import multivariate_normal
 from scipy.stats import multivariate_t
+from scipy.stats import norm
+from scipy.stats import gennorm
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import distance
@@ -53,6 +55,8 @@ def gen_codebook(basic_dict):
         if codewords_per_axis % 2 == 1:
             inner.remove(basic_dict['d_x']*[0.0])
         return np.array(outer_circle+inner), None
+    if basic_dict['codebook_type'] == "Custom":
+        return np.array([[-1, -1], [1, 1]]), None
 
 
 def gen_multimodal_means(basic_dict, n_gaussians, mix_dist):
@@ -116,6 +120,12 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_means=None, mix_dist=No
         mixture_idx = np.random.choice(len(mixture_dist), size=n, replace=True, p=mixture_dist)
         samples = np.array([rvs[idx].rvs(1) for idx in mixture_idx])
         return samples, covs, means, mixture_dist, None
+    if basic_dict['noise_type'] == "Custom":
+        rv1 = norm(0, np.sqrt(0.5*noise_energy))
+        beta = 0.1
+        rv2 = gennorm(beta=beta, scale=np.sqrt(0.5*noise_energy/gennorm.var(beta=beta)))
+        samples = np.column_stack((rv2.rvs(n), rv1.rvs(n)))
+        return samples, (1/(0.5*noise_energy))*np.eye(2), np.array([0, 0]), None, None
 
 
 def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):
@@ -307,40 +317,26 @@ def plot_error_rate(train_errors, train_rule_error, train_naive_error, test_erro
         plt.close()
 
 
-def plot_snr_error_rate(errors, cov_errors, basic_dict, mean_sol_errors=None):
+def plot_snr_error_rate(errors, labels, basic_dict):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     print(basic_dict['snr_range'])
     print(errors)
-    print(cov_errors)
-    ax.plot(basic_dict['snr_range'], errors, color='blue', marker='s', linewidth=2, label=r'$H_T$')
-    ax.plot(basic_dict['snr_range'], cov_errors, color='black', linestyle='dashed', marker='s', linewidth=2, label=r'$f(\cdot)$')
-    if mean_sol_errors is not None:
-        ax.plot(basic_dict['snr_range'], mean_sol_errors, color='red', linestyle='dashed', marker='s', linewidth=2, label=r'$\mu_x$')
+    colors = ['blue', 'black', 'green', 'red']
+    for index, error in enumerate(errors):
+        ax.plot(basic_dict['snr_range'], error, color=colors[index], marker='s', linewidth=2, label=labels[index])
     ax.tick_params(labelsize='medium', width=3)
     plt.axvline(x=10*np.log10(basic_dict['code_energy']/basic_dict['noise_energy']))
     plt.legend()
-    # plt.yscale('symlog', linthresh=10**-7)
     plt.yscale('log')
-    # plt.ylim([-10**-7, 1])
     plt.xlabel('SNR [dB]')
     plt.ylabel('Error Probability')
     plt.grid()
     plt.savefig('Error_Probability_SNR')
     plt.close()
-    f = open('SNR_errors.npy', 'wb')
+    f = open('all_errors.npy', 'wb')
     np.save(f, errors)
     f.close()
-    f = open('SNR_cov_errors.npy', 'wb')
-    np.save(f, cov_errors)
-    f.close()
-    f = open('SNR_range.npy', 'wb')
-    np.save(f, basic_dict['snr_range'])
-    f.close()
-    if mean_sol_errors is not None:
-        f = open('SNR_mean_sol_errors.npy', 'wb')
-        np.save(f, mean_sol_errors)
-        f.close()
 
 
 def projection(h1, s1):

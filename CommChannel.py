@@ -17,6 +17,7 @@ class CommChannel(ABC):
         self.snr_test = False
         self.just_replot_SNR = False
         self.lambda_sweep = False
+        self.labels = None
         self.init_operation_type()
 
     def init_operation_type(self):
@@ -127,18 +128,18 @@ class CommChannel(ABC):
         test_rule_classification = self.rule_decode(codebook, test_dataset, rule)
         train_rule_error = np.sum(train_rule_classification != train_true_classification) / len(train_true_classification)
         test_rule_error = np.sum(test_rule_classification != test_true_classification) / len(test_true_classification)
-        train_naive_classification = self.naive_decode(codebook, train_dataset)
-        test_naive_classification = self.naive_decode(codebook, test_dataset)
-        train_naive_error = np.sum(train_naive_classification != train_true_classification) / len(train_true_classification)
-        test_naive_error = np.sum(test_naive_classification != test_true_classification) / len(test_true_classification)
-        utils.plot_error_rate(train_errors, train_rule_error, train_naive_error, test_errors, test_rule_error,
-                              test_naive_error, lambda_scale, basic_dict['iter_gap'])
+        train_estimator_classification = self.estimator_decode(codebook, train_dataset, basic_dict['estimation_decoder'])
+        test_estimator_classification = self.estimator_decode(codebook, test_dataset, basic_dict['estimation_decoder'])
+        train_estimator_error = np.sum(train_estimator_classification != train_true_classification) / len(train_true_classification)
+        test_estimator_error = np.sum(test_estimator_classification != test_true_classification) / len(test_true_classification)
+        utils.plot_error_rate(train_errors, train_rule_error, train_estimator_error, test_errors, test_rule_error,
+                              test_estimator_error, lambda_scale, basic_dict['iter_gap'])
         basic_dict['train_errors'] = train_errors
         basic_dict['test_errors'] = test_errors
         basic_dict['train_rule_error'] = train_rule_error
         basic_dict['test_rule_error'] = test_rule_error
-        basic_dict['train_naive_error'] = train_naive_error
-        basic_dict['test_naive_error'] = test_naive_error
+        basic_dict['train_estimator_error'] = train_estimator_error
+        basic_dict['test_estimator_error'] = test_estimator_error
         basic_dict['min_test_iter'] = 50+np.argmin(test_errors[50:])
 
     @abstractmethod
@@ -154,17 +155,23 @@ class CommChannel(ABC):
         pass
 
     @abstractmethod
-    def naive_decode(self, codebook, dataset):
+    def no_learning_decode(self, codebook, dataset):
+        pass
+
+    @abstractmethod
+    def get_estimation_decoder(self, codebook, dataset, noise_dataset):
+        pass
+
+    @abstractmethod
+    def estimator_decode(self, codebook, dataset, estimator):
         pass
 
     def run_snr_test(self, basic_dict, codebook, solution):
         snr_range = list(np.linspace(basic_dict['train_snr'] - 10, basic_dict['train_snr'] + 10, 2 * basic_dict['snr_steps']))
         snr_range.append(basic_dict['train_snr'])
         basic_dict['snr_range'] = list(np.sort(snr_range))
-        errors, rule_errors, naive_errors = self.perform_snr_test(solution[0][basic_dict['min_test_iter']], codebook, basic_dict)
-        basic_dict['snr_errors'] = errors
-        basic_dict['snr_rule_errors'] = rule_errors
-        basic_dict['snr_naive_errors'] = naive_errors
+        all_errors = self.perform_snr_test(solution[0][basic_dict['min_test_iter']], codebook, basic_dict)
+        basic_dict['snr_errors'], basic_dict['snr_rule_errors'], basic_dict['snr_estimation_errors'], basic_dict['snr_naive_errors'] = all_errors
 
     def perform_snr_test(self, decoder, codebook, basic_dict):
         np.random.seed(basic_dict["snr_seed"])
@@ -172,7 +179,8 @@ class CommChannel(ABC):
         n_cycles = basic_dict["snr_test_cycles"]
         total_errors = np.zeros(len(basic_dict['snr_range']))
         total_rule_errors = np.zeros(len(basic_dict['snr_range']))
-        total_naive_errors = np.zeros(len(basic_dict['snr_range']))
+        total_estimator_errors = np.zeros(len(basic_dict['snr_range']))
+        total_no_learning_errors = np.zeros(len(basic_dict['snr_range']))
         noise_energy_range = [basic_dict['code_energy'] * 10 ** (-s / 10) for s in basic_dict['snr_range']]
         rule = self.get_rule(basic_dict)
         true_classification = self.get_true_classification(basic_dict, val_size)
@@ -186,30 +194,22 @@ class CommChannel(ABC):
                                                                       n_energy, basic_dict['df'])
                 new_snr_trans = self.transform_dataset(codebook, new_snr_dataset, basic_dict, rule)
                 datasets.append(new_snr_trans)
-            errors = np.zeros(len(basic_dict['snr_range']))
-            rule_errors = np.zeros(len(basic_dict['snr_range']))
-            naive_errors = np.zeros(len(basic_dict['snr_range']))
             for index in range(len(basic_dict['snr_range'])):
                 print("SNR index " + str(index))
                 classification = self.decode(codebook, datasets[index], decoder)
-                error = np.sum(classification != true_classification) / len(true_classification)
-                errors[index] = error
+                total_errors[index] += np.sum(classification != true_classification) / len(true_classification)
                 classification = self.rule_decode(codebook, datasets[index], rule)
-                rule_error = np.sum(classification != true_classification) / len(true_classification)
-                rule_errors[index] = rule_error
-                classification = self.naive_decode(codebook, datasets[index])
-                naive_error = np.sum(classification != true_classification) / len(true_classification)
-                naive_errors[index] = naive_error
+                total_rule_errors[index] += np.sum(classification != true_classification) / len(true_classification)
+                classification = self.estimator_decode(codebook, datasets[index], basic_dict['estimation_decoder'])
+                total_estimator_errors[index] += np.sum(classification != true_classification) / len(true_classification)
+                classification = self.no_learning_decode(codebook, datasets[index])
+                if classification.all() is not None:
+                    total_no_learning_errors[index] += np.sum(classification != true_classification) / len(true_classification)
                 if i == 0:
                     utils.plot_dataset(datasets[index], basic_dict['snr_range'][index], codebook, basic_dict)
-            total_errors += errors
-            total_rule_errors += rule_errors
-            total_naive_errors += naive_errors
-        total_errors = total_errors / n_cycles
-        total_rule_errors = total_rule_errors / n_cycles
-        total_naive_errors = total_naive_errors / n_cycles
-        utils.plot_snr_error_rate(total_errors, total_rule_errors, basic_dict, total_naive_errors)
-        return total_errors, total_rule_errors, total_naive_errors
+        all_errors = [total_errors/n_cycles, total_rule_errors/n_cycles, total_estimator_errors/n_cycles, total_no_learning_errors/n_cycles]
+        utils.plot_snr_error_rate(all_errors, self.labels, basic_dict)
+        return all_errors
 
     def log_run_info(self, basic_dict):
         file1 = open("log.txt", "w")
@@ -288,17 +288,20 @@ class CommChannel(ABC):
         rule = self.get_rule(basic_dict)
         train_dataset = self.transform_dataset(codebook, train_noise_dataset, basic_dict, rule)
         test_dataset = self.transform_dataset(codebook, test_noise_dataset, basic_dict, rule)
+        basic_dict['estimation_decoder'] = self.get_estimation_decoder(codebook, train_dataset, train_noise_dataset)
         utils.plot_dataset(train_dataset, basic_dict['train_snr'], codebook, basic_dict)
         if not self.load_sol_array:
             solution = self.run_algorithm(basic_dict, codebook, train_dataset, test_dataset)
         elif self.load_errors:
             utils.plot_error_rate(basic_dict['train_errors'], basic_dict['train_rule_error'],
-                                  basic_dict['train_naive_error'], basic_dict['test_errors'],
-                                  basic_dict['test_rule_error'], basic_dict['test_naive_error'])
+                                  basic_dict['train_estimator_error'], basic_dict['test_errors'],
+                                  basic_dict['test_rule_error'], basic_dict['test_estimator_error'])
         if self.snr_test:
             self.run_snr_test(basic_dict, codebook, solution)
         if self.just_replot_SNR:
-            utils.plot_snr_error_rate(basic_dict['snr_errors'], basic_dict['snr_rule_errors'], basic_dict)
+            all_errors = [basic_dict['snr_errors'], basic_dict['snr_rule_errors'], basic_dict['snr_estimation_errors'],
+                          basic_dict['snr_naive_errors']]
+            utils.plot_snr_error_rate(all_errors, self.labels, basic_dict)
         if self.save:
             self.save_data(codebook, train_noise_dataset, test_noise_dataset, solution, basic_dict)
         self.log_run_info(basic_dict)

@@ -9,6 +9,7 @@ class NonLinearChannel(CommChannel):
     def __init__(self):
         super().__init__(model="LTNN")
         self.channel_trans = None
+        self.labels = [r'$H_T$', r'$f(\cdot)$', r'$\mu_x$']
 
     def load_sol(self):
         f = open('s_array.npy', 'rb')
@@ -120,12 +121,19 @@ class NonLinearChannel(CommChannel):
         inv_trans = lambda y, cb: np.argmin([distance.euclidean(trans(c), y) for c in cb])
         return np.apply_along_axis(inv_trans, 1, dataset, codebook)
 
-    def naive_decode(self, codebook, dataset):
+    def no_learning_decode(self, codebook, dataset):
+        return None
+
+    def get_estimation_decoder(self, codebook, dataset, noise_dataset):
         n = dataset.shape[0]
         m = codebook.shape[0]
         sample_per_word = int(n / m)
-        trans_codebook = np.array([np.mean(dataset[sample_per_word * i:sample_per_word * (i + 1) - 1], axis=0) for i in range(m)])
-        examples_minus_codewords = np.repeat(dataset, m, axis=0) - np.tile(trans_codebook, (n, 1))
+        return np.array([np.mean(dataset[sample_per_word * i:sample_per_word * (i + 1) - 1], axis=0) for i in range(m)])
+
+    def estimator_decode(self, codebook, dataset, estimator):
+        n = dataset.shape[0]
+        m = codebook.shape[0]
+        examples_minus_codewords = np.repeat(dataset, m, axis=0) - np.tile(estimator, (n, 1))
         a = np.einsum('ij,ji->i', examples_minus_codewords, examples_minus_codewords.T)
         b = np.reshape(a, (n, m))
         return np.argmin(b, axis=1)
