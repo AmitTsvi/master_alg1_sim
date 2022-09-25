@@ -7,7 +7,6 @@ import numpy as np
 from scipy.spatial import distance
 from numpy.linalg import inv
 from numpy.linalg import matrix_rank
-from numpy import linalg as LA
 from datetime import datetime
 import os
 from sympy.utilities.iterables import multiset_permutations
