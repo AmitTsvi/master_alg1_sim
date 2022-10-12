@@ -205,6 +205,8 @@ def plot_dataset(dataset, snr, codebook, basic_dict):
             ax.scatter(dataset[i, :, 0], dataset[i, :, 1], marker='x', s=10)
     plt.grid()
     plt.title('Codebook and Output Samples')
+    plt.xlim(-4, 4)
+    plt.ylim(-4, 4)
     plt.savefig('Codebook_and_samples_'+str(snr).split(".")[0]+'_'+str(snr).split(".")[1])
     plt.close()
 
@@ -242,7 +244,9 @@ def single_to_double_index(l, m):
     return i, j
 
 
-def plot_decoding(dataset, classification, basic_dict, t):
+def plot_decoding(dataset, classification, basic_dict, t, title=None):
+    if not title:
+        title = 'Iteration_'+str(t).zfill(6)
     fig = plt.figure()
     cm = plt.get_cmap('gist_rainbow')
     ax = fig.add_subplot(111)
@@ -252,10 +256,13 @@ def plot_decoding(dataset, classification, basic_dict, t):
             ax.scatter(dataset[np.where(classification == i), 0], dataset[np.where(classification == i), 1],
                        marker='x', s=10)
         if basic_dict['model'] == "MNN":
-            ax.scatter(dataset[i, :, 0], dataset[i, :, 1], marker='x', s=10)
+            dataset = dataset.reshape(-1, basic_dict['d_x'])
+            ax.scatter(dataset[classification==i,0], dataset[classification==i,1], marker='x', s=10)
     ax.set_title("Classification")
+    plt.xlim(-4, 4)
+    plt.ylim(-4, 4)
     plt.grid()
-    plt.savefig('Iteration_'+str(t).zfill(6))
+    plt.savefig(title+".png")
     plt.close()
 
 
@@ -273,7 +280,8 @@ def gen_partition(deltas):
     P_arr = []
     for vector in basis:
         P_arr.append(np.array([vector]))
-    P_arr.append(np.array(additional_partition))
+    if additional_partition:
+        P_arr.append(np.array(additional_partition))
     return P_arr
 
 

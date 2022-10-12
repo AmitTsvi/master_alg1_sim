@@ -16,7 +16,7 @@ class AdditiveNoiseChannel(CommChannel):
         return [s_array]
 
     def init_dict(self):
-        d = 3
+        d = 2
         basic_dict = {"d_x": d, "d_y": d, "m": 2, "n": 2000, "test_n_ratio": 4, "iterations": 600,
                       "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 15, "codebook_type": "Custom",
                       "codeword_energy": 1, "noise_type": "Custom", "noise_energy": 1.5, "snr_steps": 10,

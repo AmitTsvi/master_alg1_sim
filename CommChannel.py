@@ -93,7 +93,7 @@ class CommChannel(ABC):
 
     def run_algorithm(self, basic_dict, codebook, train_dataset, test_dataset):
         deltas = utils.delta_array(codebook, basic_dict)
-        partition = utils.gen_partition(codebook)
+        partition = utils.gen_partition(deltas)
         if self.lambda_sweep:
             log_range = np.logspace(basic_dict["lambda_range"][0], basic_dict["lambda_range"][1], 6)
             for lambda_i in log_range:
@@ -196,17 +196,22 @@ class CommChannel(ABC):
                 datasets.append(new_snr_trans)
             for index in range(len(basic_dict['snr_range'])):
                 print("SNR index " + str(index))
-                classification = self.decode(codebook, datasets[index], decoder)
-                total_errors[index] += np.sum(classification != true_classification) / len(true_classification)
-                classification = self.rule_decode(codebook, datasets[index], rule)
-                total_rule_errors[index] += np.sum(classification != true_classification) / len(true_classification)
-                classification = self.estimator_decode(codebook, datasets[index], basic_dict['estimation_decoder'])
-                total_estimator_errors[index] += np.sum(classification != true_classification) / len(true_classification)
-                classification = self.no_learning_decode(codebook, datasets[index])
-                if classification.all() is not None:
-                    total_no_learning_errors[index] += np.sum(classification != true_classification) / len(true_classification)
+                learn_classification = self.decode(codebook, datasets[index], decoder)
+                total_errors[index] += np.sum(learn_classification != true_classification) / len(true_classification)
+                rule_classification = self.rule_decode(codebook, datasets[index], rule)
+                total_rule_errors[index] += np.sum(rule_classification != true_classification) / len(true_classification)
+                estimate_classification = self.estimator_decode(codebook, datasets[index], basic_dict['estimation_decoder'])
+                total_estimator_errors[index] += np.sum(estimate_classification != true_classification) / len(true_classification)
+                no_learn_classification = self.no_learning_decode(codebook, datasets[index])
+                if no_learn_classification.all() is not None:
+                    total_no_learning_errors[index] += np.sum(no_learn_classification != true_classification) / len(true_classification)
                 if i == 0:
                     utils.plot_dataset(datasets[index], basic_dict['snr_range'][index], codebook, basic_dict)
+                if i == 0 and basic_dict['d_x'] == 2:
+                    utils.plot_decoding(datasets[index], learn_classification, basic_dict, 1, "Learned Decoder " + str(basic_dict['snr_range'][index]))
+                    utils.plot_decoding(datasets[index], rule_classification, basic_dict, 1, "Rule Decoder " + str(basic_dict['snr_range'][index]))
+                    utils.plot_decoding(datasets[index], estimate_classification, basic_dict, 1, "Estimated Decoder " + str(basic_dict['snr_range'][index]))
+                    utils.plot_decoding(datasets[index], no_learn_classification, basic_dict, 1, "Trivial Decoder " + str(basic_dict['snr_range'][index]))
         all_errors = [total_errors/n_cycles, total_rule_errors/n_cycles, total_estimator_errors/n_cycles, total_no_learning_errors/n_cycles]
         utils.plot_snr_error_rate(all_errors, self.labels, basic_dict)
         return all_errors
