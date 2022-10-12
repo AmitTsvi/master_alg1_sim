@@ -2,6 +2,7 @@ from scipy.stats import multivariate_normal
 from scipy.stats import multivariate_t
 from scipy.stats import norm
 from scipy.stats import gennorm
+from scipy.stats import uniform
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import distance
@@ -122,7 +123,8 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_means=None, mix_dist=No
     if basic_dict['noise_type'] == "Custom":
         rv1 = norm(0, np.sqrt(0.5*noise_energy))
         beta = 0.1
-        rv2 = gennorm(beta=beta, scale=np.sqrt(0.5*noise_energy/gennorm.var(beta=beta)))
+        #rv2 = gennorm(beta=beta, scale=np.sqrt(0.5*noise_energy/gennorm.var(beta=beta)))
+        rv2 = uniform(scale=np.sqrt(0.5*noise_energy))
         samples = np.column_stack((rv2.rvs(n), rv1.rvs(n)))
         return samples, (1/(0.5*noise_energy))*np.eye(2), np.array([0, 0]), None, None
 
@@ -223,7 +225,7 @@ def delta_array(codebook, basic_dict):
 def get_near_psd(s):
     eigval, eigvec = np.linalg.eig(s)
     eigval[eigval < 0] = 0
-    return eigvec.dot(np.diag(eigval)).dot(eigvec.T)
+    return eigvec@np.diag(eigval)@inv(eigvec)
 
 
 def double_to_single_index(i, j, m):
@@ -257,7 +259,7 @@ def plot_decoding(dataset, classification, basic_dict, t, title=None):
                        marker='x', s=10)
         if basic_dict['model'] == "MNN":
             dataset = dataset.reshape(-1, basic_dict['d_x'])
-            ax.scatter(dataset[classification==i,0], dataset[classification==i,1], marker='x', s=10)
+            ax.scatter(dataset[classification == i, 0], dataset[classification == i, 1], marker='x', s=10)
     ax.set_title("Classification")
     plt.xlim(-4, 4)
     plt.ylim(-4, 4)
