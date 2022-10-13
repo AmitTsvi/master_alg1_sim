@@ -97,20 +97,20 @@ class CommChannel(ABC):
         if self.lambda_sweep:
             log_range = np.logspace(basic_dict["lambda_range"][0], basic_dict["lambda_range"][1], 6)
             for lambda_i in log_range:
-                solution = self.subgradient_alg(basic_dict, codebook, train_dataset, lambda_i, partition, deltas)
+                solution, obj_vals = self.subgradient_alg(basic_dict, codebook, train_dataset, lambda_i, partition, deltas)
                 print("Finished running alg, now testing")
-                self.plot_pegasos(solution[0], codebook, train_dataset, test_dataset, basic_dict, lambda_i)
+                self.plot_pegasos(solution[0], codebook, train_dataset, test_dataset, basic_dict, obj_vals, lambda_i)
         else:
-            solution = self.subgradient_alg(basic_dict, codebook, train_dataset, basic_dict['scale_lambda'], partition, deltas)
+            solution, obj_vals = self.subgradient_alg(basic_dict, codebook, train_dataset, basic_dict['scale_lambda'], partition, deltas)
             print("Finished running alg, now testing")
-            self.plot_pegasos(solution[0], codebook, train_dataset, test_dataset, basic_dict, basic_dict['scale_lambda'])
-        return solution
+            self.plot_pegasos(solution[0], codebook, train_dataset, test_dataset, basic_dict, obj_vals, basic_dict['scale_lambda'])
+        return solution, obj_vals
 
     @abstractmethod
     def subgradient_alg(self, basic_dict, codebook, dataset, lambda_i, partition, deltas):
         pass
 
-    def plot_pegasos(self, decoders, codebook, train_dataset, test_dataset, basic_dict, lambda_scale=None):
+    def plot_pegasos(self, decoders, codebook, train_dataset, test_dataset, basic_dict, obj_vals, lambda_scale=None):
         train_errors = []
         test_errors = []
         test_n = basic_dict['n'] * basic_dict['test_n_ratio']
@@ -133,13 +133,14 @@ class CommChannel(ABC):
         train_estimator_error = np.sum(train_estimator_classification != train_true_classification) / len(train_true_classification)
         test_estimator_error = np.sum(test_estimator_classification != test_true_classification) / len(test_true_classification)
         utils.plot_error_rate(train_errors, train_rule_error, train_estimator_error, test_errors, test_rule_error,
-                              test_estimator_error, lambda_scale, basic_dict['iter_gap'])
+                              test_estimator_error, obj_vals, lambda_scale, basic_dict['iter_gap'])
         basic_dict['train_errors'] = train_errors
         basic_dict['test_errors'] = test_errors
         basic_dict['train_rule_error'] = train_rule_error
         basic_dict['test_rule_error'] = test_rule_error
         basic_dict['train_estimator_error'] = train_estimator_error
         basic_dict['test_estimator_error'] = test_estimator_error
+        basic_dict['obj_vals'] = obj_vals
         basic_dict['min_test_iter'] = 50+np.argmin(test_errors[50:])
 
     @abstractmethod
@@ -300,7 +301,7 @@ class CommChannel(ABC):
         elif self.load_errors:
             utils.plot_error_rate(basic_dict['train_errors'], basic_dict['train_rule_error'],
                                   basic_dict['train_estimator_error'], basic_dict['test_errors'],
-                                  basic_dict['test_rule_error'], basic_dict['test_estimator_error'])
+                                  basic_dict['test_rule_error'], basic_dict['test_estimator_error'], basic_dict['obj_vals'])
         if self.snr_test:
             self.run_snr_test(basic_dict, codebook, solution)
         if self.just_replot_SNR:

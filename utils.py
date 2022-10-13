@@ -301,7 +301,8 @@ def make_run_dir(load, load_dir, basic_dict):
     os.chdir(fin_string)
 
 
-def plot_error_rate(train_errors, train_rule_error, train_naive_error, test_errors, test_rule_error, test_naive_error, lambda_scale=None, iter_gap=1):
+def plot_error_rate(train_errors, train_rule_error, train_naive_error, test_errors, test_rule_error, test_naive_error,
+                    obj_vals, lambda_scale=None, iter_gap=1):
     for i in range(2):
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -315,6 +316,9 @@ def plot_error_rate(train_errors, train_rule_error, train_naive_error, test_erro
             ax.plot(iter_axis, train_errors, linewidth=2, color='blue')
             ax.plot(iter_axis, len(iter_axis)*[train_rule_error], color='black', linestyle='dashed')
             ax.plot(iter_axis, len(iter_axis)*[train_naive_error], color='red', linestyle='dashed')
+            ax2 = ax.twinx()
+            ax2.plot(obj_vals[::iter_gap], color='orange')
+            plt.yscale('log')
             plt.title('Train Error')
             plt.savefig('Train_Error_Probability_'+str(lambda_scale).replace(".", "_"))
         else:

@@ -13,14 +13,14 @@ class AdditiveNoiseChannel(CommChannel):
         f = open('s_array.npy', 'rb')
         s_array = np.load(f)
         f.close()
-        return [s_array]
+        return s_array
 
     def init_dict(self):
         d = 2
         basic_dict = {"d_x": d, "d_y": d, "m": 2, "n": 2000, "test_n_ratio": 4, "iterations": 600,
-                      "scale_lambda": 0.1, "etas": (d+1)*[1/(d+1)], "seed": 15, "codebook_type": "Custom",
-                      "codeword_energy": 1, "noise_type": "Custom", "noise_energy": 1.5, "snr_steps": 10,
-                      "snr_seed": 777, "lambda_range": [-4, -1], "batch_size": 50, "model": "MNN", "iter_gap": 1,
+                      "scale_lambda": 0.004, "etas": (d+1)*[1/(d+1)], "seed": 15, "codebook_type": "Custom",
+                      "codeword_energy": 1, "noise_type": "Custom", "noise_energy": 2.5, "snr_steps": 10,
+                      "snr_seed": 777, "lambda_range": [-4, -2], "batch_size": 50, "model": "MNN", "iter_gap": 1,
                       "snr_val_size": 100000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 752}
         return basic_dict
 
@@ -42,6 +42,7 @@ class AdditiveNoiseChannel(CommChannel):
 
     def subgradient_alg(self, basic_dict, codebook, dataset, scale_lambda, partition, deltas):
         s_array = []
+        obj_vals = np.zeros(basic_dict['iterations'])
         np.random.seed(basic_dict['batch_seed'])
         if basic_dict['init_matrix'] == "identity":
             s = np.eye(basic_dict['d_x'])
@@ -61,16 +62,18 @@ class AdditiveNoiseChannel(CommChannel):
                 a_t = ((-1) ** which_word) * (y_t - 0.5 * (x_p_t + x_q_t))
                 if a_t.T @ s @ delta_p_q_t < 1:
                     v_t += 0.5 * (delta_p_q_t @ a_t.T + a_t @ delta_p_q_t.T)
+                obj_vals[t-1] += (1/basic_dict["batch_size"]) * max(0, 1-a_t.T@s@delta_p_q_t)
             grad_t = 0
             for i, p_i in enumerate(partition):
                 delta_p_q_star = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
                 grad_t += basic_dict['etas'][i] * (
                             s @ delta_p_q_star @ delta_p_q_star.T + delta_p_q_star @ delta_p_q_star.T @ s)
+                obj_vals[t-1] += scale_lambda * basic_dict['etas'][i] * (LA.norm(s@delta_p_q_star) ** 2)
             grad_t = scale_lambda * grad_t - v_t / basic_dict["batch_size"]
             s -= (1 / (scale_lambda * t)) * grad_t
             s = utils.get_near_psd(s)
             s_array.append(s)
-        return [s_array]
+        return [s_array], obj_vals
 
     def get_true_classification(self, basic_dict, n_samples):
         return np.array([i for i in range(basic_dict['m']) for j in range(n_samples)])

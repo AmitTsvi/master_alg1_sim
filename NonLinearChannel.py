@@ -55,6 +55,7 @@ class NonLinearChannel(CommChannel):
     def subgradient_alg(self, basic_dict, codebook, dataset, scale_lambda, partition, deltas):
         s_array = []
         h_array = []
+        obj_vals = np.zeros(basic_dict['iterations'])
         np.random.seed(basic_dict['batch_seed'])
         if basic_dict['init_matrix'] == "identity":
             s = np.eye(basic_dict['d_x'])
@@ -83,6 +84,8 @@ class NonLinearChannel(CommChannel):
                             else:
                                 v_h_t += y_t @ (x_j - x_tag_e).T - 0.5 * h @ (
                                             (x_j + x_tag_e) @ (x_j - x_tag_e).T + (x_j - x_tag_e) @ (x_j + x_tag_e).T)
+                    obj_vals[t-1] += max(0, 1 - (y_t.T@h@(x_j - x_tag_e)-0.5*(x_j + x_tag_e).T@s@(x_j - x_tag_e)))
+                obj_vals[t-1] = obj_vals[t-1] / (basic_dict["batch_size"] * (basic_dict['m'] - 1))
             grad_h_t = 0
             grad_s_t = 0
             for i, p_i in enumerate(partition):
@@ -90,6 +93,8 @@ class NonLinearChannel(CommChannel):
                 grad_h_t += basic_dict['etas'][i] * 2 * (h @ delta_h @ delta_h.T)
                 delta_s = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
                 grad_s_t += basic_dict['etas'][i] * (s @ delta_s @ delta_s.T + delta_s @ delta_s.T @ s)
+                obj_vals[t-1] += scale_lambda * basic_dict['etas'][i] * (LA.norm(h @ delta_h) ** 2)
+                obj_vals[t-1] += scale_lambda * basic_dict['etas'][i] * (LA.norm(s @ delta_h) ** 2)
             grad_h_t = scale_lambda[0] * grad_h_t - v_h_t / (basic_dict["batch_size"] * (basic_dict['m'] - 1))
             grad_s_t = scale_lambda[1] * grad_s_t + 0.25 * v_s_t / (basic_dict["batch_size"] * (basic_dict['m'] - 1))
             if scale_lambda[0] == 0 or scale_lambda[1] == 0:
@@ -102,7 +107,7 @@ class NonLinearChannel(CommChannel):
                 h, s = utils.projection(h, s)
             h_array.append(np.copy(h))
             s_array.append(np.copy(s))
-        return h_array, s_array
+        return [h_array, s_array], obj_vals
 
     def get_true_classification(self, basic_dict, n_samples):
         return np.repeat(np.array([i for i in range(basic_dict['m'])]), int(n_samples / basic_dict['m']), axis=0)
