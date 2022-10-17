@@ -124,7 +124,7 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_means=None, mix_dist=No
         rv1 = norm(0, np.sqrt(0.5*noise_energy))
         beta = 0.1
         #rv2 = gennorm(beta=beta, scale=np.sqrt(0.5*noise_energy/gennorm.var(beta=beta)))
-        rv2 = uniform(scale=np.sqrt(0.5*noise_energy))
+        rv2 = uniform(loc=-3*0.5*noise_energy, scale=6*0.5*noise_energy)
         samples = np.column_stack((rv2.rvs(n), rv1.rvs(n)))
         return samples, (1/(0.5*noise_energy))*np.eye(2), np.array([0, 0]), None, None
 

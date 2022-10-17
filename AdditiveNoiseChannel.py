@@ -17,10 +17,10 @@ class AdditiveNoiseChannel(CommChannel):
 
     def init_dict(self):
         d = 2
-        basic_dict = {"d_x": d, "d_y": d, "m": 2, "n": 2000, "test_n_ratio": 4, "iterations": 600,
-                      "scale_lambda": 0.004, "etas": (d+1)*[1/(d+1)], "seed": 15, "codebook_type": "Custom",
-                      "codeword_energy": 1, "noise_type": "Custom", "noise_energy": 2.5, "snr_steps": 10,
-                      "snr_seed": 777, "lambda_range": [-4, -2], "batch_size": 50, "model": "MNN", "iter_gap": 1,
+        basic_dict = {"d_x": d, "d_y": d, "m": 2, "n": 2000, "test_n_ratio": 4, "iterations": 6000,
+                      "scale_lambda": 1, "etas": (d+1)*[1/(d+1)], "seed": 15, "codebook_type": "Custom",
+                      "codeword_energy": 1, "noise_type": "Custom", "noise_energy": 0.65, "snr_steps": 10,
+                      "snr_seed": 777, "lambda_range": [-3.5, -2.5], "batch_size": 50, "model": "MNN", "iter_gap": 1,
                       "snr_val_size": 100000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 752}
         return basic_dict
 

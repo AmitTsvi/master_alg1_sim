@@ -95,7 +95,7 @@ class CommChannel(ABC):
         deltas = utils.delta_array(codebook, basic_dict)
         partition = utils.gen_partition(deltas)
         if self.lambda_sweep:
-            log_range = np.logspace(basic_dict["lambda_range"][0], basic_dict["lambda_range"][1], 6)
+            log_range = np.logspace(basic_dict["lambda_range"][0], basic_dict["lambda_range"][1], 12)
             for lambda_i in log_range:
                 solution, obj_vals = self.subgradient_alg(basic_dict, codebook, train_dataset, lambda_i, partition, deltas)
                 print("Finished running alg, now testing")
