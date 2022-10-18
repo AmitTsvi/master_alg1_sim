@@ -17,11 +17,11 @@ class AdditiveNoiseChannel(CommChannel):
 
     def init_dict(self):
         d = 2
-        basic_dict = {"d_x": d, "d_y": d, "m": 2, "n": 2000, "test_n_ratio": 4, "iterations": 6000,
-                      "scale_lambda": 1, "etas": (d+1)*[1/(d+1)], "seed": 15, "codebook_type": "Custom",
-                      "codeword_energy": 1, "noise_type": "Custom", "noise_energy": 0.65, "snr_steps": 10,
-                      "snr_seed": 777, "lambda_range": [-3.5, -2.5], "batch_size": 50, "model": "MNN", "iter_gap": 1,
-                      "snr_val_size": 100000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 752}
+        basic_dict = {"d_x": d, "d_y": d, "m": 64, "n": 100, "test_n_ratio": 4, "iterations": 1000,
+                      "scale_lambda": 10**-7, "etas": (d+1)*[1/(d+1)], "seed": 25, "codebook_type": "Grid",
+                      "codeword_energy": 1, "noise_type": "Mixture", "noise_energy": 0.005, "snr_steps": 10,
+                      "snr_seed": 777, "lambda_range": [-6, -4], "batch_size": 50, "model": "MNN", "iter_gap": 1,
+                      "snr_val_size": 10000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 752}
         return basic_dict
 
     def get_rule(self, basic_dict):
@@ -61,13 +61,13 @@ class AdditiveNoiseChannel(CommChannel):
                 delta_p_q_t = np.expand_dims(deltas[utils.double_to_single_index(p_t, q_t, basic_dict['m'])], axis=1)
                 a_t = ((-1) ** which_word) * (y_t - 0.5 * (x_p_t + x_q_t))
                 if a_t.T @ s @ delta_p_q_t < 1:
-                    v_t += 0.5 * (delta_p_q_t @ a_t.T + a_t @ delta_p_q_t.T)
+                    v_t += delta_p_q_t @ a_t.T + a_t @ delta_p_q_t.T - np.diag(np.diag(a_t @ delta_p_q_t.T))
                 obj_vals[t-1] += (1/basic_dict["batch_size"]) * max(0, 1-a_t.T@s@delta_p_q_t)
             grad_t = 0
             for i, p_i in enumerate(partition):
                 delta_p_q_star = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
                 grad_t += basic_dict['etas'][i] * (
-                            s @ delta_p_q_star @ delta_p_q_star.T + delta_p_q_star @ delta_p_q_star.T @ s)
+                            s @ delta_p_q_star @ delta_p_q_star.T + delta_p_q_star @ delta_p_q_star.T @ s - np.diag(np.diag(s @ delta_p_q_star @ delta_p_q_star.T)))
                 obj_vals[t-1] += scale_lambda * basic_dict['etas'][i] * (LA.norm(s@delta_p_q_star) ** 2)
             grad_t = scale_lambda * grad_t - v_t / basic_dict["batch_size"]
             s -= (1 / (scale_lambda * t)) * grad_t
