@@ -1,5 +1,5 @@
 from scipy.stats import multivariate_normal
-from scipy.stats import multivariate_t
+# from scipy.stats import multivariate_t
 from scipy.stats import norm
 from scipy.stats import gennorm
 from scipy.stats import uniform
@@ -156,7 +156,7 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):
 
     if trans_type in ["Quadratic"]:
         _, a = gen_transformation(d_x, d_y, "Rotate", max_eigenvalue, min_eigenvalue)
-        _, b = gen_transformation(d_x**2, d_y, "Linear", 0.2*max_eigenvalue, 0.2*min_eigenvalue)
+        _, b = gen_transformation(d_x**2, d_y, "Linear", max_eigenvalue, min_eigenvalue)
 
         def f(x):
             x_1 = np.expand_dims(x, 1)
@@ -177,7 +177,7 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):
 
 
 def rebuild_trans_from_kernel(f_kernel, trans_type):
-    if trans_type in ["Linear", "identity", "Rotate"]:
+    if trans_type in ["Linear", "identity", "Rotate", "Linear_Invertible"]:
         def f(x):
             return f_kernel @ x
 
@@ -317,7 +317,7 @@ def plot_error_rate(train_errors, train_rule_error, train_naive_error, test_erro
             ax.plot(iter_axis, len(iter_axis)*[train_rule_error], color='black', linestyle='dashed')
             ax.plot(iter_axis, len(iter_axis)*[train_naive_error], color='red', linestyle='dashed')
             ax2 = ax.twinx()
-            ax2.plot(obj_vals[::iter_gap], color='orange')
+            ax2.plot(iter_axis, obj_vals[::iter_gap], color='orange')
             plt.yscale('log')
             plt.title('Train Error')
             plt.savefig('Train_Error_Probability_'+str(lambda_scale).replace(".", "_"))
@@ -336,8 +336,8 @@ def plot_snr_error_rate(errors, labels, basic_dict):
     print(basic_dict['snr_range'])
     print(errors)
     colors = ['blue', 'black', 'green', 'red']
-    for index, error in enumerate(errors):
-        ax.plot(basic_dict['snr_range'], error, color=colors[index], marker='s', linewidth=2, label=labels[index])
+    for index, label in enumerate(labels):
+        ax.plot(basic_dict['snr_range'], errors[index], color=colors[index], marker='s', linewidth=2, label=label)
     ax.tick_params(labelsize='medium', width=3)
     plt.axvline(x=10*np.log10(basic_dict['code_energy']/basic_dict['noise_energy']))
     plt.legend()
@@ -363,6 +363,8 @@ def projection(h1, s1):
     constraints = [LMI1 >> 0]
     # constraints = [s2-h2.T@h2 >> 0]
     prob = cp.Problem(obj, constraints)
-    prob.solve(solver=cp.SCS)
+    # prob.solve(solver=cp.CVXOPT)
+    # prob.solve(solver=cp.MOSEK)
+    prob.solve(solver=cp.SCS, eps=1e-7, verbose=False)
 
     return h2.value, s2.value

@@ -21,7 +21,7 @@ class CommChannel(ABC):
         self.init_operation_type()
 
     def init_operation_type(self):
-        op_num = input("Insert operation type:\n1: save\n2: Lambda sweep\n3: SNR test\nYour choice: ")
+        op_num = input("Insert operation type:\n1: save\n2: Lambda sweep\n3: SNR test\n4: Replot SNR\nYour choice: ")
         if op_num == '1':
             self.save = True
         elif op_num == '2':
@@ -31,6 +31,11 @@ class CommChannel(ABC):
             self.load_sol_array = True
             self.load_errors = True
             self.snr_test = True
+        elif op_num == '4':
+            self.load = True
+            self.load_sol_array = True
+            self.load_errors = True
+            self.just_replot_SNR = True
         else:
             print("Illegal choice")
             exit()
@@ -171,8 +176,7 @@ class CommChannel(ABC):
         snr_range = list(np.linspace(basic_dict['train_snr'] - 10, basic_dict['train_snr'] + 10, 2 * basic_dict['snr_steps']))
         snr_range.append(basic_dict['train_snr'])
         basic_dict['snr_range'] = list(np.sort(snr_range))
-        all_errors = self.perform_snr_test(solution[0][basic_dict['min_test_iter']], codebook, basic_dict)
-        basic_dict['snr_errors'], basic_dict['snr_rule_errors'], basic_dict['snr_estimation_errors'], basic_dict['snr_naive_errors'] = all_errors
+        self.perform_snr_test(solution[0][basic_dict['min_test_iter']], codebook, basic_dict)
 
     def perform_snr_test(self, decoder, codebook, basic_dict):
         np.random.seed(basic_dict["snr_seed"])
@@ -204,7 +208,7 @@ class CommChannel(ABC):
                 estimate_classification = self.estimator_decode(codebook, datasets[index], basic_dict['estimation_decoder'])
                 total_estimator_errors[index] += np.sum(estimate_classification != true_classification) / len(true_classification)
                 no_learn_classification = self.no_learning_decode(codebook, datasets[index])
-                if no_learn_classification.all() is not None:
+                if no_learn_classification and no_learn_classification.all() is not None:
                     total_no_learning_errors[index] += np.sum(no_learn_classification != true_classification) / len(true_classification)
                 if i == 0:
                     utils.plot_dataset(datasets[index], basic_dict['snr_range'][index], codebook, basic_dict)
@@ -214,8 +218,9 @@ class CommChannel(ABC):
                     utils.plot_decoding(datasets[index], estimate_classification, basic_dict, 1, "Estimated Decoder " + str(basic_dict['snr_range'][index]))
                     utils.plot_decoding(datasets[index], no_learn_classification, basic_dict, 1, "Trivial Decoder " + str(basic_dict['snr_range'][index]))
         all_errors = [total_errors/n_cycles, total_rule_errors/n_cycles, total_estimator_errors/n_cycles, total_no_learning_errors/n_cycles]
+        basic_dict['snr_errors'], basic_dict['snr_rule_errors'], basic_dict['snr_estimation_errors'], basic_dict[
+            'snr_naive_errors'] = all_errors
         utils.plot_snr_error_rate(all_errors, self.labels, basic_dict)
-        return all_errors
 
     def log_run_info(self, basic_dict):
         file1 = open("log.txt", "w")
@@ -297,7 +302,7 @@ class CommChannel(ABC):
         basic_dict['estimation_decoder'] = self.get_estimation_decoder(codebook, train_dataset, train_noise_dataset)
         utils.plot_dataset(train_dataset, basic_dict['train_snr'], codebook, basic_dict)
         if not self.load_sol_array:
-            solution = self.run_algorithm(basic_dict, codebook, train_dataset, test_dataset)
+            solution, obj_vals = self.run_algorithm(basic_dict, codebook, train_dataset, test_dataset)
         elif self.load_errors:
             utils.plot_error_rate(basic_dict['train_errors'], basic_dict['train_rule_error'],
                                   basic_dict['train_estimator_error'], basic_dict['test_errors'],

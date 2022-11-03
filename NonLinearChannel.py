@@ -23,12 +23,12 @@ class NonLinearChannel(CommChannel):
     def init_dict(self):
         d_x = 2
         d_y = 2
-        basic_dict = {"d_x": d_x, "d_y": d_y, "m": 16, "n": 160, "test_n_ratio": 4, "iterations": 1600,
-                      "scale_lambda": (0.0229, 0.0229),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 3, "codebook_type": "Grid",
-                      "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.01, "snr_steps": 10,
-                      "snr_seed": 6, "lambda_range": [-2, -1], "batch_size": 1, "model": "LTNN", "iter_gap": 1,
-                      "snr_val_size": 5000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 752,
-                       "trans_type": "Quadratic", "max_eigenvalue": 1, "min_eigenvalue": 0.8, "with_s": True}
+        basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 320, "test_n_ratio": 4, "iterations": 700,
+                      "scale_lambda": (10**-3, 10**-4),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 21, "codebook_type": "TwoCircles",
+                      "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.08, "snr_steps": 10,
+                      "snr_seed": 6, "lambda_range": [-3, 0], "batch_size": 50, "model": "LTNN", "iter_gap": 1,
+                      "snr_val_size": 10000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 752,
+                       "trans_type": "Quadratic", "max_eigenvalue": 2, "min_eigenvalue": 0.8, "with_s": True}
         return basic_dict
 
     def get_rule(self, basic_dict):
@@ -53,15 +53,19 @@ class NonLinearChannel(CommChannel):
         return dup_trans_codewords + noise_dataset
 
     def subgradient_alg(self, basic_dict, codebook, dataset, scale_lambda, partition, deltas):
+        if type(scale_lambda) is not tuple:
+            scale_lambda = (scale_lambda, scale_lambda)
         s_array = []
         h_array = []
         obj_vals = np.zeros(basic_dict['iterations'])
         np.random.seed(basic_dict['batch_seed'])
         if basic_dict['init_matrix'] == "identity":
             s = np.eye(basic_dict['d_x'])
+            h = np.eye(basic_dict['d_y'], basic_dict['d_x'])
         else:
             s = np.zeros((basic_dict['d_x'], basic_dict['d_x']))
-        h = np.zeros((basic_dict['d_y'], basic_dict['d_x']))
+            h = np.zeros((basic_dict['d_y'], basic_dict['d_x']))
+        iter_size = basic_dict["batch_size"] * (basic_dict['m'] - 1)
         print("Starting algorithm run with " + str(scale_lambda))
         for t in range(1, basic_dict['iterations'] + 1):
             v_h_t = 0
@@ -69,23 +73,23 @@ class NonLinearChannel(CommChannel):
             for k in range(basic_dict["batch_size"]):
                 z_t = np.random.randint(basic_dict['n'])
                 y_t = np.expand_dims(dataset[z_t], axis=1)
-                x_j = np.expand_dims(codebook[int(np.floor(z_t / (basic_dict['n'] / basic_dict['m'])))], axis=1)
+                x_j = np.expand_dims(codebook[int(z_t // (basic_dict['n'] / basic_dict['m']))], axis=1)
                 for x_tag in codebook:
                     x_tag_e = np.expand_dims(x_tag, axis=1)
+                    words_plus = x_j + x_tag_e
+                    words_minus = x_j - x_tag_e
                     if not np.array_equal(x_tag_e, x_j):
                         if basic_dict["with_s"]:
-                            indicate = y_t.T @ h @ (x_j - x_tag_e) - 0.5 * (x_j + x_tag_e).T @ s @ (x_j - x_tag_e)
+                            if y_t.T @ h @ words_minus - 0.5 * words_plus.T @ s @ words_minus < 1:
+                                v_h_t += y_t @ words_minus.T / iter_size
+                                v_s_t += (words_plus @ words_minus.T + words_minus @ words_plus.T - np.diag(np.diag(words_plus @ words_minus.T))) / iter_size
+                            obj_vals[t - 1] += max(0, 1 - (
+                                        y_t.T @ h @ words_minus - 0.5 * words_plus.T @ s @ words_minus)) / iter_size
                         else:
-                            indicate = y_t.T @ h @ (x_j - x_tag_e) - 0.5 * (x_j + x_tag_e).T @ h.T @ h @ (x_j - x_tag_e)
-                        if indicate < 1:
-                            if basic_dict["with_s"]:
-                                v_h_t += y_t @ (x_j - x_tag_e).T
-                                v_s_t += (x_j + x_tag_e) @ (x_j - x_tag_e).T + (x_j - x_tag_e) @ (x_j + x_tag_e).T - np.diag(np.diag((x_j + x_tag_e) @ (x_j - x_tag_e).T))
-                            else:
-                                v_h_t += y_t @ (x_j - x_tag_e).T - 0.5 * h @ (
-                                            (x_j + x_tag_e) @ (x_j - x_tag_e).T + (x_j - x_tag_e) @ (x_j + x_tag_e).T)
-                    obj_vals[t-1] += max(0, 1 - (y_t.T@h@(x_j - x_tag_e)-0.5*(x_j + x_tag_e).T@s@(x_j - x_tag_e)))
-                obj_vals[t-1] = obj_vals[t-1] / (basic_dict["batch_size"] * (basic_dict['m'] - 1))
+                            if y_t.T @ h @ words_minus - 0.5 * words_plus.T @ h.T @ h @ words_minus < 1:
+                                v_h_t += (y_t @ words_minus.T - 0.5 * h @ (words_plus @ words_minus.T + words_minus @ words_plus.T)) / iter_size
+                            obj_vals[t - 1] += max(0, 1 - (
+                                        y_t.T @ h @ words_minus - 0.5 * words_plus.T @ h.T @ h @ words_minus)) / iter_size
             grad_h_t = 0
             grad_s_t = 0
             for i, p_i in enumerate(partition):
@@ -93,20 +97,26 @@ class NonLinearChannel(CommChannel):
                 grad_h_t += basic_dict['etas'][i] * 2 * (h @ delta_h @ delta_h.T)
                 delta_s = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
                 grad_s_t += basic_dict['etas'][i] * (s @ delta_s @ delta_s.T + delta_s @ delta_s.T @ s - np.diag(np.diag(s @ delta_s @ delta_s.T)))
-                obj_vals[t-1] += scale_lambda * basic_dict['etas'][i] * (LA.norm(h @ delta_h) ** 2)
-                obj_vals[t-1] += scale_lambda * basic_dict['etas'][i] * (LA.norm(s @ delta_h) ** 2)
-            grad_h_t = scale_lambda[0] * grad_h_t - v_h_t / (basic_dict["batch_size"] * (basic_dict['m'] - 1))
-            grad_s_t = scale_lambda[1] * grad_s_t + 0.25 * v_s_t / (basic_dict["batch_size"] * (basic_dict['m'] - 1))
+                obj_vals[t-1] += scale_lambda[0] * basic_dict['etas'][i] * (LA.norm(h @ delta_h) ** 2)
+                if basic_dict["with_s"]:
+                    obj_vals[t-1] += scale_lambda[1] * basic_dict['etas'][i] * (LA.norm(s @ delta_s) ** 2)
+            grad_h_t = scale_lambda[0] * grad_h_t - v_h_t
+            grad_s_t = scale_lambda[1] * grad_s_t + 0.5 * v_s_t
             if scale_lambda[0] == 0 or scale_lambda[1] == 0:
                 h -= (1 / t) * grad_h_t
                 s -= (1 / t) * grad_s_t
             else:
                 h -= (1 / (scale_lambda[0] * t)) * grad_h_t
                 s -= (1 / (scale_lambda[1] * t)) * grad_s_t
+            max_val = max(np.max(h), np.max(s))
+            # h = h / max_val
+            # s = s / max_val
             if basic_dict["with_s"]:
                 h, s = utils.projection(h, s)
-            h_array.append(np.copy(h))
-            s_array.append(np.copy(s))
+            # h = h * max_val
+            # s = s * max_val
+            h_array.append(h)
+            s_array.append(s)
         return [h_array, s_array], obj_vals
 
     def get_true_classification(self, basic_dict, n_samples):
@@ -154,7 +164,7 @@ class NonLinearChannel(CommChannel):
 
     def log_run_info(self, basic_dict):
         super().log_run_info(basic_dict)
-        file1 = open("log.txt", "w")
+        file1 = open("log.txt", "a")
         file1.write("Transformation type: " + basic_dict["trans_type"] + "\n")
         file1.write("Transformation singular values between " + str(basic_dict["min_eigenvalue"]) + "and " + str(basic_dict["max_eigenvalue"]) + "\n")
         file1.write("Transformation Kernels:" + "\n")
