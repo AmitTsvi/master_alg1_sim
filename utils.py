@@ -155,16 +155,14 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):
         f_kernel = trans
 
     if trans_type in ["Quadratic"]:
-        _, a = gen_transformation(d_x, d_y, "Rotate", max_eigenvalue, min_eigenvalue)
-        _, b = gen_transformation(d_x**2, d_y, "Linear", max_eigenvalue, min_eigenvalue)
+        _, b = gen_transformation(d_x+3, d_y, "Linear", max_eigenvalue, min_eigenvalue)
 
         def f(x):
-            x_1 = np.expand_dims(x, 1)
-            x_2 = np.expand_dims((x_1@x_1.T).flatten(), 1)
-            res = a @ x_1 + b @ x_2
+            x_1 = np.array([[x[0], x[0]**2, x[1], x[1]**2, x[0]*x[1]]])
+            res = b @ x_1.T
             return np.squeeze(res)
 
-        f_kernel = (a, b)
+        f_kernel = b
 
     if trans_type == "Identity":
 
@@ -183,9 +181,8 @@ def rebuild_trans_from_kernel(f_kernel, trans_type):
 
     if trans_type in ["Quadratic"]:
         def f(x):
-            x_1 = np.expand_dims(x, 1)
-            x_2 = np.expand_dims((x_1@x_1.T).flatten(), 1)
-            res = f_kernel[0] @ x_1 + f_kernel[1] @ x_2
+            x_1 = np.array([x[0], x[0]**2, x[1], x[1]**2, x[0]*x[1]])
+            res = f_kernel[1] @ x_1
             return np.squeeze(res)
 
     return f
@@ -364,7 +361,7 @@ def projection(h1, s1):
     # constraints = [s2-h2.T@h2 >> 0]
     prob = cp.Problem(obj, constraints)
     # prob.solve(solver=cp.CVXOPT)
-    # prob.solve(solver=cp.MOSEK)
-    prob.solve(solver=cp.SCS, eps=1e-7, verbose=False)
+    prob.solve(solver=cp.MOSEK)
+    # prob.solve(solver=cp.SCS, eps=1e-7, verbose=False)
 
     return h2.value, s2.value

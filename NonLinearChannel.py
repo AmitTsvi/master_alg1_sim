@@ -23,12 +23,12 @@ class NonLinearChannel(CommChannel):
     def init_dict(self):
         d_x = 2
         d_y = 2
-        basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 320, "test_n_ratio": 4, "iterations": 700,
-                      "scale_lambda": (10**-3, 10**-4),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 21, "codebook_type": "TwoCircles",
-                      "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.08, "snr_steps": 10,
-                      "snr_seed": 6, "lambda_range": [-3, 0], "batch_size": 50, "model": "LTNN", "iter_gap": 1,
-                      "snr_val_size": 10000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 752,
-                       "trans_type": "Quadratic", "max_eigenvalue": 2, "min_eigenvalue": 0.8, "with_s": True}
+        basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 3200, "test_n_ratio": 4, "iterations": 3000,
+                      "scale_lambda": (10**0, 10**0),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 103, "codebook_type": "TwoCircles",
+                      "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.003, "snr_steps": 10,
+                      "snr_seed": 6, "lambda_range": [-9, -4], "batch_size": 10, "model": "LTNN", "iter_gap": 1,
+                      "snr_val_size": 10000, "snr_test_cycles": 20, "init_matrix": "identity", "batch_seed": 14,
+                       "trans_type": "Quadratic", "max_eigenvalue": 1.1, "min_eigenvalue": 0.9, "with_s": True}
         return basic_dict
 
     def get_rule(self, basic_dict):
@@ -70,10 +70,10 @@ class NonLinearChannel(CommChannel):
         for t in range(1, basic_dict['iterations'] + 1):
             v_h_t = 0
             v_s_t = 0
+            batch_indices = np.random.randint(basic_dict['n'], size=basic_dict["batch_size"])
             for k in range(basic_dict["batch_size"]):
-                z_t = np.random.randint(basic_dict['n'])
-                y_t = np.expand_dims(dataset[z_t], axis=1)
-                x_j = np.expand_dims(codebook[int(z_t // (basic_dict['n'] / basic_dict['m']))], axis=1)
+                y_t = np.expand_dims(dataset[batch_indices[k]], axis=1)
+                x_j = np.expand_dims(codebook[int(batch_indices[k] // (basic_dict['n'] / basic_dict['m']))], axis=1)
                 for x_tag in codebook:
                     x_tag_e = np.expand_dims(x_tag, axis=1)
                     words_plus = x_j + x_tag_e
@@ -96,7 +96,7 @@ class NonLinearChannel(CommChannel):
                 delta_h = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(h, p_i.T), axis=0) ** 2)], axis=1)
                 grad_h_t += basic_dict['etas'][i] * 2 * (h @ delta_h @ delta_h.T)
                 delta_s = np.expand_dims(p_i[np.argmax(LA.norm(np.dot(s, p_i.T), axis=0) ** 2)], axis=1)
-                grad_s_t += basic_dict['etas'][i] * (s @ delta_s @ delta_s.T + delta_s @ delta_s.T @ s - np.diag(np.diag(s @ delta_s @ delta_s.T)))
+                grad_s_t += basic_dict['etas'][i] * 2 * (s @ delta_s @ delta_s.T + delta_s @ delta_s.T @ s - np.diag(np.diag(s @ delta_s @ delta_s.T)))
                 obj_vals[t-1] += scale_lambda[0] * basic_dict['etas'][i] * (LA.norm(h @ delta_h) ** 2)
                 if basic_dict["with_s"]:
                     obj_vals[t-1] += scale_lambda[1] * basic_dict['etas'][i] * (LA.norm(s @ delta_s) ** 2)
@@ -108,13 +108,13 @@ class NonLinearChannel(CommChannel):
             else:
                 h -= (1 / (scale_lambda[0] * t)) * grad_h_t
                 s -= (1 / (scale_lambda[1] * t)) * grad_s_t
-            max_val = max(np.max(h), np.max(s))
-            # h = h / max_val
-            # s = s / max_val
             if basic_dict["with_s"]:
+                # norm_factor = min(np.max(h), np.max(s))
+                # h = h / norm_factor
+                # s = s / norm_factor
                 h, s = utils.projection(h, s)
-            # h = h * max_val
-            # s = s * max_val
+                # h = h * norm_factor
+                # s = s * norm_factor
             h_array.append(h)
             s_array.append(s)
         return [h_array, s_array], obj_vals
