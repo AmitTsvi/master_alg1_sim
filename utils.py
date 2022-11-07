@@ -155,10 +155,10 @@ def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):
         f_kernel = trans
 
     if trans_type in ["Quadratic"]:
-        _, b = gen_transformation(d_x+3, d_y, "Linear", max_eigenvalue, min_eigenvalue)
+        _, b = gen_transformation(d_x+1, d_y, "Linear", max_eigenvalue, min_eigenvalue)
 
         def f(x):
-            x_1 = np.array([[x[0], x[0]**2, x[1], x[1]**2, x[0]*x[1]]])
+            x_1 = np.array([[x[0], x[1], x[0]*x[1]]])
             res = b @ x_1.T
             return np.squeeze(res)
 
@@ -181,8 +181,8 @@ def rebuild_trans_from_kernel(f_kernel, trans_type):
 
     if trans_type in ["Quadratic"]:
         def f(x):
-            x_1 = np.array([x[0], x[0]**2, x[1], x[1]**2, x[0]*x[1]])
-            res = f_kernel[1] @ x_1
+            x_1 = np.array([x[0], x[1], x[0]*x[1]])
+            res = f_kernel @ x_1
             return np.squeeze(res)
 
     return f
