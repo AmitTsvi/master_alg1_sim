@@ -84,7 +84,7 @@ class CommChannel(ABC):
         basic_dict['mix_dist'] = mix_dist
         basic_dict['mix_means'] = mix_means
         basic_dict['df'] = df
-        test_noise_dataset, _, _, _, _ = utils.gen_noise_dataset(basic_dict, basic_dict["test_n_ratio"]*basic_dict['n'],
+        test_noise_dataset, _, _, _, _ = utils.gen_noise_dataset(basic_dict, int(basic_dict["test_n_ratio"]*basic_dict['n']),
                                                            noise_cov, mix_means, mix_dist, None, df)
         return train_noise_dataset, test_noise_dataset
 
@@ -118,7 +118,7 @@ class CommChannel(ABC):
     def plot_pegasos(self, decoders, codebook, train_dataset, test_dataset, basic_dict, obj_vals, lambda_scale=None):
         train_errors = []
         test_errors = []
-        test_n = basic_dict['n'] * basic_dict['test_n_ratio']
+        test_n = int(basic_dict['n'] * basic_dict['test_n_ratio'])
         train_true_classification = self.get_true_classification(basic_dict, basic_dict['n'])
         test_true_classification = self.get_true_classification(basic_dict, test_n)
         for t in range(0, basic_dict['iterations'], basic_dict['iter_gap']):
@@ -208,7 +208,7 @@ class CommChannel(ABC):
                 estimate_classification = self.estimator_decode(codebook, datasets[index], basic_dict['estimation_decoder'])
                 total_estimator_errors[index] += np.sum(estimate_classification != true_classification) / len(true_classification)
                 no_learn_classification = self.no_learning_decode(codebook, datasets[index])
-                if no_learn_classification and no_learn_classification.all() is not None:
+                if no_learn_classification.all() is not None:
                     total_no_learning_errors[index] += np.sum(no_learn_classification != true_classification) / len(true_classification)
                 if i == 0:
                     utils.plot_dataset(datasets[index], basic_dict['snr_range'][index], codebook, basic_dict)
@@ -250,6 +250,7 @@ class CommChannel(ABC):
             file1.write("Lambda: " + str(basic_dict['scale_lambda']) + "\n")
         file1.write("Etas: " + str(basic_dict['etas']) + "\n")
         file1.write("Seed: " + str(basic_dict['seed']) + "\n")
+        file1.write("Batch selection seed: " + str(basic_dict['batch_seed']) + "\n")
         file1.write("SNR test seed: " + str(basic_dict['snr_seed']) + "\n")
         if basic_dict['code_cov'] is not None:
             file1.write("Random codebook covariance:" + "\n")
@@ -299,7 +300,8 @@ class CommChannel(ABC):
         rule = self.get_rule(basic_dict)
         train_dataset = self.transform_dataset(codebook, train_noise_dataset, basic_dict, rule)
         test_dataset = self.transform_dataset(codebook, test_noise_dataset, basic_dict, rule)
-        basic_dict['estimation_decoder'] = self.get_estimation_decoder(codebook, train_dataset, train_noise_dataset)
+        basic_dict['estimation_decoder'] = self.get_estimation_decoder(codebook, utils.combine_datasets(basic_dict, train_dataset, test_dataset),
+                                                                       np.concatenate((train_noise_dataset, test_noise_dataset), axis=0))
         utils.plot_dataset(train_dataset, basic_dict['train_snr'], codebook, basic_dict)
         if not self.load_sol_array:
             solution, obj_vals = self.run_algorithm(basic_dict, codebook, train_dataset, test_dataset)

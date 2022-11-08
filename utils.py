@@ -129,6 +129,14 @@ def gen_noise_dataset(basic_dict, n, noise_cov=None, mix_means=None, mix_dist=No
         return samples, (1/(0.5*noise_energy))*np.eye(2), np.array([0, 0]), None, None
 
 
+def combine_datasets(basic_dict, dataset1, dataset2):
+    d1 = dataset1.reshape((basic_dict['m'], -1, basic_dict['d_y']))
+    d2 = dataset2.reshape((basic_dict['m'], -1, basic_dict['d_y']))
+    union_d = np.concatenate((d1, d2), axis=1)
+    union_d_reshape = union_d.reshape((-1, basic_dict['d_y']))
+    return union_d_reshape
+
+
 def gen_transformation(d_x, d_y, trans_type, max_eigenvalue, min_eigenvalue):
     if trans_type == "Linear_Invertible" and d_x != d_y:
         print("Asking for invertible non-square matrix")

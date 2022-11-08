@@ -23,12 +23,12 @@ class NonLinearChannel(CommChannel):
     def init_dict(self):
         d_x = 2
         d_y = 2
-        basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 320, "test_n_ratio": 4, "iterations": 3000,
-                      "scale_lambda": (10**-2, 10**-3),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 17, "codebook_type": "TwoCircles",
-                      "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.06, "snr_steps": 10,
-                      "snr_seed": 6, "lambda_range": [-3, -1], "batch_size": 1, "model": "LTNN", "iter_gap": 1,
-                      "snr_val_size": 10000, "snr_test_cycles": 20, "init_matrix": "zeros", "batch_seed": 15,
-                       "trans_type": "Quadratic", "max_eigenvalue": 1.2, "min_eigenvalue": 0.6, "with_s": True}
+        basic_dict = {"d_x": d_x, "d_y": d_y, "m": 8, "n": 800, "test_n_ratio": 1, "iterations": 1400,
+                      "scale_lambda": (10**-3, 10**-4),  "etas": (d_x+1)*[1/(d_x+1)], "seed": 5, "codebook_type": "TwoCircles",
+                      "codeword_energy": 1, "noise_type": "WhiteGaussian", "noise_energy": 0.5, "snr_steps": 10,
+                      "snr_seed": 6, "lambda_range": [-3.5, -2.5], "batch_size": 10, "model": "LTNN", "iter_gap": 1,
+                      "snr_val_size": 10000, "snr_test_cycles": 20, "init_matrix": "zeros", "batch_seed": 5,
+                       "trans_type": "Linear_Invertible", "max_eigenvalue": 2, "min_eigenvalue": 1, "with_s": True}
         return basic_dict
 
     def get_rule(self, basic_dict):
